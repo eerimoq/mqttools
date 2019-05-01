@@ -6,6 +6,7 @@ import binascii
 from socketserver import StreamRequestHandler
 from socketserver import ThreadingMixIn
 from socketserver import TCPServer
+import queue
 
 import mqttools
 
@@ -45,6 +46,16 @@ class ClientHandler(StreamRequestHandler):
 
 class BrokerThread(ThreadingMixIn, TCPServer):
     pass
+
+
+class Client(mqttools.Client):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.queue = queue.Queue()
+
+    def on_message(self, topic, message):
+        self.queue.put((topic, message))
 
 
 class MQTToolsTest(unittest.TestCase):
@@ -100,13 +111,23 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\x82\x09\x00\x01\x00\x04\x2f\x61\x2f\x62\x00'),
             # SUBACK
             ('s2c', b'\x90\x03\x00\x01\x00'),
+            # PUBLISH
+            (
+                's2c',
+                b'\x30\x09\x00\x04\x2f\x61\x2f\x62\x61\x70\x61'
+            ),
             # DISCONNECT
             ('c2s', b'\xe0\x00')
         ]
 
-        client = mqttools.Client(*self.broker.server_address, b'bar')
+        client = Client(*self.broker.server_address, b'bar')
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe(b'/a/b', 0))
+
+        while client.queue.empty():
+            self.run_until_complete(asyncio.sleep(0.05))
+
+        self.assertEqual(client.queue.get(), (b'/a/b', b'apa'))
         self.run_until_complete(client.stop())
 
     def test_publish_qos_0(self):
