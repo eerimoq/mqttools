@@ -38,6 +38,11 @@ CONNECTION_ACCEPTED = 0
 LOGGER = logging.getLogger(__name__)
 
 
+class ConnectionError(Exception):
+
+    pass
+
+
 def pack_string(data):
     packed = struct.pack('>H', len(data))
     packed += data
@@ -170,7 +175,7 @@ class Client(object):
                  will_topic=b'',
                  will_message=b'',
                  will_qos=0,
-                 keep_alive_s=3600,
+                 keep_alive_s=0,
                  response_timeout=5):
         self._host = host
         self._port = port
@@ -205,9 +210,20 @@ class Client(object):
         self._reader_task.cancel()
         self._keep_alive_task.cancel()
 
-        await self._monitor_task
-        await self._reader_task
-        await self._keep_alive_task
+        try:
+            await self._monitor_task
+        except asyncio.CancelledError:
+            pass
+
+        try:
+            await self._reader_task
+        except asyncio.CancelledError:
+            pass
+
+        try:
+            await self._keep_alive_task
+        except asyncio.CancelledError:
+            pass
 
         self._writer.close()
 
@@ -281,7 +297,7 @@ class Client(object):
         while True:
             try:
                 packet_type, flags, payload = await self._read_packet()
-            except Exception:
+            except ConnectionError:
                 LOGGER.info('Failed to read packet.')
                 await asyncio.sleep(1)
                 continue
@@ -303,15 +319,18 @@ class Client(object):
         """
 
         while True:
-            await asyncio.sleep(self._keep_alive_s / 2)
-            self._pingresp_event.clear()
-            self._write_packet(pack_ping())
+            if self._keep_alive_s == 0:
+                await asyncio.sleep(1)
+            else:
+                await asyncio.sleep(self._keep_alive_s / 2)
+                self._pingresp_event.clear()
+                self._write_packet(pack_ping())
 
-            try:
-                await asyncio.wait_for(self._pingresp_event.wait(),
-                                       self._response_timeout)
-            except asyncio.TimeoutError:
-                LOGGER.warning('Timeout waiting for ping response.')
+                try:
+                    await asyncio.wait_for(self._pingresp_event.wait(),
+                                           self._response_timeout)
+                except asyncio.TimeoutError:
+                    LOGGER.warning('Timeout waiting for ping response.')
 
     def _write_packet(self, message):
         LOGGER.debug('Sending packet %s to the broker.', message)
@@ -322,7 +341,7 @@ class Client(object):
         buf = await self._reader.read(1)
 
         if len(buf) != 1:
-            raise Exception()
+            raise ConnectionError()
 
         packet_type, flags = bitstruct.unpack('u4u4', buf)
         size = 0
@@ -333,7 +352,7 @@ class Client(object):
             buf = await self._reader.read(1)
 
             if len(buf) != 1:
-                raise Exception()
+                raise ConnectionError()
 
             byte = buf[0]
             size += ((byte & 0x7f) * multiplier)
@@ -342,7 +361,7 @@ class Client(object):
         data = await self._reader.read(size)
 
         if len(data) != size:
-            raise Exception()
+            raise ConnectionError()
 
         LOGGER.debug('Received packet %s from the broker.', data)
 
@@ -377,11 +396,7 @@ async def publisher(host, port, topic, message, qos):
     print(f'QoS:     {qos}')
 
     await client.publish(topic, message, qos)
-
-    try:
-        await client.stop()
-    except asyncio.CancelledError:
-        pass
+    await client.stop()
 
 
 def _do_subscribe(args):
