@@ -5,6 +5,7 @@ import argparse
 import struct
 import enum
 import bitstruct
+from io import BytesIO
 
 from .version import __version__
 
@@ -27,7 +28,7 @@ class ControlPacketType(enum.IntEnum):
     DISCONNECT   = 14
 
 # Connection flags.
-CLEAN_SESSION   = 0x02
+CLEAN_START     = 0x02
 WILL_FLAG       = 0x04
 WILL_QOS_1      = 0x08
 WILL_QOS_2      = 0x10
@@ -36,6 +37,12 @@ PASSWORD_FLAG   = 0x40
 USER_NAME_FLAG  = 0x80
 
 CONNECTION_ACCEPTED = 0
+
+class DisconnectReasonCode(enum.IntEnum):
+    NORMAL = 0
+
+# MQTT 5.0
+PROTOCOL_VERSION = 5
 
 LOGGER = logging.getLogger(__name__)
 
@@ -56,20 +63,40 @@ def pack_string(data):
     return packed
 
 
-def pack_fixed_header(message_type, flags, size):
-    packed = bitstruct.pack('u4u4', message_type, flags)
-
-    if size == 0:
-        packed += b'\x00'
+def pack_variable_integer(value):
+    if value == 0:
+        packed = b'\x00'
     else:
-        while size > 0:
-            encoded_byte = (size & 0x7f)
-            size >>= 7
+        packed = b''
 
-            if size > 0:
+        while value > 0:
+            encoded_byte = (value & 0x7f)
+            value >>= 7
+
+            if value > 0:
                 encoded_byte |= 0x80
 
             packed += struct.pack('B', encoded_byte)
+
+    return packed
+
+
+def unpack_variable_integer(payload):
+    value = 0
+    multiplier = 1
+    byte = 0x80
+
+    while (byte & 0x80) == 0x80:
+        byte = payload.read(1)[0]
+        value += ((byte & 0x7f) * multiplier)
+        multiplier <<= 7
+
+    return value
+
+
+def pack_fixed_header(message_type, flags, size):
+    packed = bitstruct.pack('u4u4', message_type, flags)
+    packed += pack_variable_integer(size)
 
     return packed
 
@@ -82,7 +109,7 @@ def pack_connect(client_id,
     if bool(len(will_topic)) != bool(len(will_message)):
         raise Exception()
 
-    flags = CLEAN_SESSION
+    flags = CLEAN_START
     payload_length = len(client_id) + 2
 
     if will_topic:
@@ -98,10 +125,14 @@ def pack_connect(client_id,
 
     packed = pack_fixed_header(ControlPacketType.CONNECT,
                                0,
-                               10 + payload_length)
+                               10 + payload_length + 1)
     packed += struct.pack('>H', 4)
     packed += b'MQTT'
-    packed += struct.pack('>BBH', 4, flags, keep_alive_s)
+    packed += struct.pack('>BBHB',
+                          PROTOCOL_VERSION,
+                          flags,
+                          keep_alive_s,
+                          0)
     packed += pack_string(client_id)
 
     if will_topic:
@@ -114,12 +145,16 @@ def pack_connect(client_id,
 
 
 def pack_disconnect():
-    return pack_fixed_header(ControlPacketType.DISCONNECT, 0, 0)
+    packed = pack_fixed_header(ControlPacketType.DISCONNECT, 0, 2)
+    packed += struct.pack('B', DisconnectReasonCode.NORMAL)
+    packed += pack_variable_integer(0)
+
+    return packed
 
 
 def pack_subscribe(topic, qos):
-    packed = pack_fixed_header(ControlPacketType.SUBSCRIBE, 2, len(topic) + 5)
-    packed += struct.pack('>BBH', 0, 1, len(topic))
+    packed = pack_fixed_header(ControlPacketType.SUBSCRIBE, 2, len(topic) + 6)
+    packed += struct.pack('>HBH', 1, 0, len(topic))
     packed += topic
     packed += struct.pack('B', qos)
 
@@ -127,7 +162,7 @@ def pack_subscribe(topic, qos):
 
 
 def pack_publish(topic, message, qos):
-    size = len(topic) + len(message) + 2
+    size = len(topic) + len(message) + 3
 
     if qos > 0:
         size += 2
@@ -135,6 +170,7 @@ def pack_publish(topic, message, qos):
     packed = pack_fixed_header(ControlPacketType.PUBLISH, qos << 1, size)
     packed += struct.pack('>H', len(topic))
     packed += topic
+    packed += pack_variable_integer(0)
 
     if qos > 0:
         packed += b'\x00\x01'
@@ -145,19 +181,22 @@ def pack_publish(topic, message, qos):
 
 
 def unpack_publish(payload, qos):
-    size = struct.unpack('>H', payload[0:2])[0]
-    topic = payload[2:2 + size]
+    size = struct.unpack('>H', payload.read(2))[0]
+    topic = payload.read(size)
+    props_size = unpack_variable_integer(payload)
+    payload.read(props_size)
 
     if qos == 0:
-        message = payload[2 + size:]
+        message = payload.read()
     else:
-        message = payload[2 + size + 2:]
+        payload.read(2)
+        message = payload.read()
 
     return topic, message
 
 
 def unpack_puback(payload):
-    return struct.unpack('>H', payload)[0]
+    return struct.unpack('>H', payload.read(2))[0]
 
 
 def pack_pubrec(payload):
@@ -326,7 +365,7 @@ class Client(object):
             else:
                 LOGGER.warning("Unsupported packet type %s with data %s.",
                                control_packet_type_to_string(packet_type),
-                               payload)
+                               payload.getvalue())
 
     async def keep_alive_main(self):
         """Ping the broker periodically to keep the connection alive.
@@ -369,7 +408,7 @@ class Client(object):
 
         LOGGER.debug('Received packet %s from the broker.', data)
 
-        return packet_type, flags, data
+        return packet_type, flags, BytesIO(data)
 
 
 async def subscriber(host, port, topic, qos):

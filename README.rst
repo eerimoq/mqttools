@@ -6,9 +6,12 @@ MQTT Tools
 
 Requires Python 3.7 or later!
 
+NOTE: This project is far from complete. Lots of MQTT features are not
+implemented yet, and those implemented are probably buggy.
+
 Features:
 
-- ``asyncio`` MQTT client.
+- ``asyncio`` MQTT 5.0 client (under development).
 
 Examples
 ========
