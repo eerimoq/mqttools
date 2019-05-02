@@ -13,7 +13,8 @@ Features:
 
 - ``asyncio`` MQTT 5.0 client (under development).
 
-MQTT 5.0 specigication: https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
+MQTT 5.0 specification:
+https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
 
 Examples
 ========
