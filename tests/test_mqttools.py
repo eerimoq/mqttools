@@ -3,10 +3,8 @@ import asyncio
 import unittest
 import threading
 import binascii
-from socketserver import StreamRequestHandler
-from socketserver import ThreadingMixIn
-from socketserver import TCPServer
 import queue
+import socket
 
 import mqttools
 
@@ -15,21 +13,42 @@ HOST = 'localhost'
 PORT = 0
 
 
-class ClientHandler(StreamRequestHandler):
+class Broker(threading.Thread):
 
     EXPECTED_DATA_INDEX = 0
     EXPECTED_DATA_STREAM = []
     ACTUAL_DATA_STREAM = []
 
-    def handle(self):
+    def __init__(self):
+        super().__init__()
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listener.bind((HOST, PORT))
+        self._listener.listen()
+        self._client_closed = queue.Queue()
+
+    @property
+    def address(self):
+        return self._listener.getsockname()
+
+    def wait_for_client_closed(self):
+        self._client_closed.get()
+
+    def run(self):
+        while True:
+            print('Broker: Listening for client...')
+            self.serve_client(self._listener.accept()[0])
+            self._client_closed.put(True)
+
+    def serve_client(self, client):
+        print('Broker: Serving client...')
+
         while self.EXPECTED_DATA_INDEX < len(self.EXPECTED_DATA_STREAM):
             _, data = self.EXPECTED_DATA_STREAM[self.EXPECTED_DATA_INDEX]
             self.EXPECTED_DATA_INDEX += 1
 
             size = len(data)
-            # print(f'Broker: Reading {size} bytes.')
-            data = self.rfile.read(size)
-            # print(f'Broker: Read {binascii.hexlify(data)}')
+            data = client.recv(size)
+            # print(f'Broker: Received: {data}')
             self.ACTUAL_DATA_STREAM.append(('c2s', data))
 
             while self.EXPECTED_DATA_INDEX < len(self.EXPECTED_DATA_STREAM):
@@ -39,13 +58,11 @@ class ClientHandler(StreamRequestHandler):
                     break
 
                 self.EXPECTED_DATA_INDEX += 1
-                # print(f'Broker: Writing {binascii.hexlify(data)}')
-                self.wfile.write(data)
+                # print(f'Broker: Sending: {data}')
+                client.send(data)
                 self.ACTUAL_DATA_STREAM.append(('s2c', data))
 
-
-class BrokerThread(ThreadingMixIn, TCPServer):
-    pass
+        client.close()
 
 
 class Client(mqttools.Client):
@@ -61,26 +78,24 @@ class Client(mqttools.Client):
 class MQTToolsTest(unittest.TestCase):
 
     def setUp(self):
-        ClientHandler.EXPECTED_DATA_INDEX = 0
-        ClientHandler.EXPECTED_DATA_STREAM = []
-        ClientHandler.ACTUAL_DATA_STREAM = []
-        self.broker = BrokerThread((HOST, PORT), ClientHandler)
-        self.broker_thread = threading.Thread(target=self.broker.serve_forever)
-        self.broker_thread.daemon = True
-        self.broker_thread.start()
+        Broker.EXPECTED_DATA_INDEX = 0
+        Broker.EXPECTED_DATA_STREAM = []
+        Broker.ACTUAL_DATA_STREAM = []
+        Broker.CLOSE_AFTER_INDEX = -1
+        self.broker = Broker()
+        self.broker.daemon = True
+        self.broker.start()
         self.loop = asyncio.get_event_loop()
 
     def tearDown(self):
-        self.broker.shutdown()
-        self.broker.server_close()
-        self.assertEqual(ClientHandler.ACTUAL_DATA_STREAM,
-                         ClientHandler.EXPECTED_DATA_STREAM)
+        self.broker.wait_for_client_closed()
+        self.assertEqual(Broker.ACTUAL_DATA_STREAM, Broker.EXPECTED_DATA_STREAM)
 
     def run_until_complete(self, coro):
         self.loop.run_until_complete(coro)
 
     def test_start_stop(self):
-        ClientHandler.EXPECTED_DATA_STREAM = [
+        Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
             (
                 'c2s',
@@ -93,12 +108,12 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x00')
         ]
 
-        client = mqttools.Client(*self.broker.server_address, b'bar')
+        client = mqttools.Client(*self.broker.address, b'bar')
         self.run_until_complete(client.start())
         self.run_until_complete(client.stop())
 
     def test_subscribe(self):
-        ClientHandler.EXPECTED_DATA_STREAM = [
+        Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
             (
                 'c2s',
@@ -120,7 +135,7 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x00')
         ]
 
-        client = Client(*self.broker.server_address, b'bar')
+        client = Client(*self.broker.address, b'bar')
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe(b'/a/b', 0))
 
@@ -131,7 +146,7 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.stop())
 
     def test_publish_qos_0(self):
-        ClientHandler.EXPECTED_DATA_STREAM = [
+        Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
             (
                 'c2s',
@@ -150,7 +165,7 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x00')
         ]
 
-        client = mqttools.Client(*self.broker.server_address, b'bar')
+        client = mqttools.Client(*self.broker.address, b'bar')
         self.run_until_complete(client.start())
         self.run_until_complete(client.publish(b'/test/foo', b'apa', 0))
         self.run_until_complete(client.stop())

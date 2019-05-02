@@ -3,26 +3,28 @@ import asyncio
 import sys
 import argparse
 import struct
+import enum
 import bitstruct
 
 from .version import __version__
 
 
 # Control packet types.
-CONNECT      = 1
-CONNACK      = 2
-PUBLISH      = 3
-PUBACK       = 4
-PUBREC       = 5
-PUBREL       = 6
-PUBCOMP      = 7
-SUBSCRIBE    = 8
-SUBACK       = 9
-UNSUBSCRIBE  = 10
-UNSUBACK     = 11
-PINGREQ      = 12
-PINGRESP     = 13
-DISCONNECT   = 14
+class ControlPacketType(enum.IntEnum):
+    CONNECT      = 1
+    CONNACK      = 2
+    PUBLISH      = 3
+    PUBACK       = 4
+    PUBREC       = 5
+    PUBREL       = 6
+    PUBCOMP      = 7
+    SUBSCRIBE    = 8
+    SUBACK       = 9
+    UNSUBSCRIBE  = 10
+    UNSUBACK     = 11
+    PINGREQ      = 12
+    PINGRESP     = 13
+    DISCONNECT   = 14
 
 # Connection flags.
 CLEAN_SESSION   = 0x02
@@ -38,9 +40,13 @@ CONNECTION_ACCEPTED = 0
 LOGGER = logging.getLogger(__name__)
 
 
-class ConnectionError(Exception):
+def control_packet_type_to_string(control_packet_type):
+    try:
+        name = ControlPacketType(control_packet_type).name
+    except ValueError:
+        name = 'UNKNOWN'
 
-    pass
+    return f'{name}({control_packet_type})'
 
 
 def pack_string(data):
@@ -90,7 +96,9 @@ def pack_connect(client_id,
         payload_length += len(will_topic) + 2
         payload_length += len(will_message) + 2
 
-    packed = pack_fixed_header(CONNECT, 0, 10 + payload_length)
+    packed = pack_fixed_header(ControlPacketType.CONNECT,
+                               0,
+                               10 + payload_length)
     packed += struct.pack('>H', 4)
     packed += b'MQTT'
     packed += struct.pack('>BBH', 4, flags, keep_alive_s)
@@ -106,11 +114,11 @@ def pack_connect(client_id,
 
 
 def pack_disconnect():
-    return pack_fixed_header(DISCONNECT, 0, 0)
+    return pack_fixed_header(ControlPacketType.DISCONNECT, 0, 0)
 
 
 def pack_subscribe(topic, qos):
-    packed = pack_fixed_header(SUBSCRIBE, 2, len(topic) + 5)
+    packed = pack_fixed_header(ControlPacketType.SUBSCRIBE, 2, len(topic) + 5)
     packed += struct.pack('>BBH', 0, 1, len(topic))
     packed += topic
     packed += struct.pack('B', qos)
@@ -124,7 +132,7 @@ def pack_publish(topic, message, qos):
     if qos > 0:
         size += 2
 
-    packed = pack_fixed_header(PUBLISH, qos << 1, size)
+    packed = pack_fixed_header(ControlPacketType.PUBLISH, qos << 1, size)
     packed += struct.pack('>H', len(topic))
     packed += topic
 
@@ -152,15 +160,22 @@ def unpack_puback(payload):
     return struct.unpack('>H', payload)[0]
 
 
+def pack_pubrec(payload):
+    packed = pack_fixed_header(ControlPacketType.PUBREC, 0, 2)
+    packed += payload
+
+    return packed
+
+
 def pack_pubrel():
-    packed = pack_fixed_header(PUBREL, 2, 2)
+    packed = pack_fixed_header(ControlPacketType.PUBREL, 2, 2)
     packed += b'\x00\x01'
 
     return packed
 
 
 def pack_ping():
-    return pack_fixed_header(PINGREQ, 0, 0)
+    return pack_fixed_header(ControlPacketType.PINGREQ, 0, 0)
 
 
 class Client(object):
@@ -287,7 +302,7 @@ class Client(object):
                 self._writer.close()
                 await self.reconnect()
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(1)
 
     async def reader_main(self):
         """Read packets from the broker.
@@ -297,21 +312,23 @@ class Client(object):
         while True:
             try:
                 packet_type, flags, payload = await self._read_packet()
-            except ConnectionError:
+            except asyncio.IncompleteReadError:
                 LOGGER.info('Failed to read packet.')
                 await asyncio.sleep(1)
                 continue
 
-            if packet_type == CONNACK:
+            if packet_type == ControlPacketType.CONNACK:
                 self.on_connack()
-            elif packet_type == PUBLISH:
+            elif packet_type == ControlPacketType.PUBLISH:
                 self.on_publish(flags, payload)
-            elif packet_type == SUBACK:
+            elif packet_type == ControlPacketType.SUBACK:
                 self.on_suback()
-            elif packet_type == PINGRESP:
+            elif packet_type == ControlPacketType.PINGRESP:
                 self.on_pingresp()
             else:
-                LOGGER.warning('Unsupported packet type %d.', packet_type)
+                LOGGER.warning("Unsupported packet type %s with data %s.",
+                               control_packet_type_to_string(packet_type),
+                               payload)
 
     async def keep_alive_main(self):
         """Ping the broker periodically to keep the connection alive.
@@ -338,30 +355,19 @@ class Client(object):
         self._writer.write(message)
 
     async def _read_packet(self):
-        buf = await self._reader.read(1)
-
-        if len(buf) != 1:
-            raise ConnectionError()
-
+        buf = await self._reader.readexactly(1)
         packet_type, flags = bitstruct.unpack('u4u4', buf)
         size = 0
         multiplier = 1
         byte = 0x80
 
         while (byte & 0x80) == 0x80:
-            buf = await self._reader.read(1)
-
-            if len(buf) != 1:
-                raise ConnectionError()
-
+            buf = await self._reader.readexactly(1)
             byte = buf[0]
             size += ((byte & 0x7f) * multiplier)
             multiplier <<= 7
 
-        data = await self._reader.read(size)
-
-        if len(data) != size:
-            raise ConnectionError()
+        data = await self._reader.readexactly(size)
 
         LOGGER.debug('Received packet %s from the broker.', data)
 
@@ -464,6 +470,9 @@ def main():
     subparser.set_defaults(func=_do_publish)
 
     args = parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
 
     if args.debug:
         args.func(args)
