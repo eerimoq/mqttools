@@ -73,6 +73,13 @@ def pack_string(data):
     return packed
 
 
+def pack_binary(data):
+    packed = struct.pack('>H', len(data))
+    packed += data
+
+    return packed
+
+
 def pack_variable_integer(value):
     if value == 0:
         packed = b'\x00'
@@ -122,7 +129,7 @@ def pack_connect(client_id,
     flags = CLEAN_START
     payload_length = len(client_id) + 2
 
-    if will_topic:
+    if will_topic and will_message:
         flags |= WILL_FLAG
 
         if will_qos == 1:
@@ -130,6 +137,7 @@ def pack_connect(client_id,
         elif will_qos == 2:
             flags |= WILL_QOS_2
 
+        payload_length += 1
         payload_length += len(will_topic) + 2
         payload_length += len(will_message) + 2
 
@@ -145,11 +153,10 @@ def pack_connect(client_id,
                           0)
     packed += pack_string(client_id)
 
-    if will_topic:
+    if flags & WILL_FLAG:
+        packed += pack_variable_integer(0)
         packed += pack_string(will_topic)
-
-    if will_message:
-        packed += pack_string(will_message)
+        packed += pack_binary(will_message)
 
     return packed
 
