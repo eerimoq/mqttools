@@ -12,37 +12,88 @@ from .version import __version__
 
 # Control packet types.
 class ControlPacketType(enum.IntEnum):
-    CONNECT      = 1
-    CONNACK      = 2
-    PUBLISH      = 3
-    PUBACK       = 4
-    PUBREC       = 5
-    PUBREL       = 6
-    PUBCOMP      = 7
-    SUBSCRIBE    = 8
-    SUBACK       = 9
-    UNSUBSCRIBE  = 10
-    UNSUBACK     = 11
-    PINGREQ      = 12
-    PINGRESP     = 13
-    DISCONNECT   = 14
+    CONNECT     = 1
+    CONNACK     = 2
+    PUBLISH     = 3
+    PUBACK      = 4
+    PUBREC      = 5
+    PUBREL      = 6
+    PUBCOMP     = 7
+    SUBSCRIBE   = 8
+    SUBACK      = 9
+    UNSUBSCRIBE = 10
+    UNSUBACK    = 11
+    PINGREQ     = 12
+    PINGRESP    = 13
+    DISCONNECT  = 14
+
 
 # Connection flags.
-CLEAN_START     = 0x02
-WILL_FLAG       = 0x04
-WILL_QOS_1      = 0x08
-WILL_QOS_2      = 0x10
-WILL_RETAIN     = 0x20
-PASSWORD_FLAG   = 0x40
-USER_NAME_FLAG  = 0x80
+CLEAN_START    = 0x02
+WILL_FLAG      = 0x04
+WILL_QOS_1     = 0x08
+WILL_QOS_2     = 0x10
+WILL_RETAIN    = 0x20
+PASSWORD_FLAG  = 0x40
+USER_NAME_FLAG = 0x80
 
-CONNECTION_ACCEPTED = 0
 
 class ConnectReasonCode(enum.IntEnum):
-    SUCCESS = 0
+    SUCCESS                       = 0
+    UNSPECIFIED_ERROR             = 128
+    MALFORMED_PACKET              = 129
+    PROTOCOL_ERROR                = 130
+    IMPLEMENTATION_SPECIFIC_ERROR = 131
+    UNSUPPORTED_PROTOCOL_VERSION  = 132
+    CLIENT_IDENTIFIER_NOT_VALID   = 133
+    BAD_USER_NAME_OR_PASSWORD     = 134
+    NOT_AUTHORIZED                = 135
+    SERVER_UNAVAILABLE            = 136
+    SERVER_BUSY                   = 137
+    BANNED                        = 138
+    BAD_AUTHENTICATION_METHOD     = 140
+    TOPIC_NAME_INVALID            = 144
+    PACKET_TOO_LARGE              = 149
+    QUOTA_EXCEEDED                = 151
+    PAYLOAD_FORMAT_INVALID        = 153
+    RETAIN_NOT_SUPPORTED          = 154
+    QOS_NOT_SUPPORTED             = 155
+    USE_ANOTHER_SERVER            = 156
+    SERVER_MOVED                  = 157
+    CONNECTION_RATE_EXCEEDED      = 159
+
 
 class DisconnectReasonCode(enum.IntEnum):
-    NORMAL = 0
+    NORMAL_DISCONNECTION                   = 0
+    DISCONNECT_WITH_WILL_MESSAGE           = 4
+    UNSPECIFIED_ERROR                      = 128
+    MALFORMED_PACKET                       = 129
+    PROTOCOL_ERROR                         = 130
+    IMPLEMENTATION_SPECIFIC_ERROR          = 131
+    NOT_AUTHORIZED                         = 135
+    SERVER_BUSY                            = 137
+    SERVER_SHUTTING_DOWN                   = 139
+    KEEP_ALIVE_TIMEOUT                     = 141
+    SESSION_TAKEN_OVER                     = 142
+    TOPIC_FILTER_INVALID                   = 143
+    TOPIC_NAME_INVALID                     = 144
+    RECEIVE_MAXIMUM_EXCEEDED               = 147
+    TOPIC_ALIAS_INVALID                    = 148
+    PACKET_TOO_LARGE                       = 149
+    MESSAGE_RATE_TOO_HIGH                  = 150
+    QUOTA_EXCEEDED                         = 151
+    ADMINISTRATIVE_ACTION                  = 152
+    PAYLOAD_FORMAT_INVALID                 = 153
+    RETAIN_NOT_SUPPORTED                   = 154
+    QOS_NOT_SUPPORTED                      = 155
+    USE_ANOTHER_SERVER                     = 156
+    SERVER_MOVED                           = 157
+    SHARED_SUBSCRIPTIONS_NOT_SUPPORTED     = 158
+    CONNECTION_RATE_EXCEEDED               = 159
+    MAXIMUM_CONNECT_TIME                   = 160
+    SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED = 161
+    WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED   = 162
+
 
 # MQTT 5.0
 PROTOCOL_VERSION = 5
@@ -177,7 +228,7 @@ def unpack_connack(payload):
 
 def pack_disconnect():
     packed = pack_fixed_header(ControlPacketType.DISCONNECT, 0, 2)
-    packed += struct.pack('B', DisconnectReasonCode.NORMAL)
+    packed += struct.pack('B', DisconnectReasonCode.NORMAL_DISCONNECTION)
     packed += pack_variable_integer(0)
 
     return packed
