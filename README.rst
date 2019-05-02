@@ -37,7 +37,7 @@ Publish
 An example connecting to an MQTT broker and publishing the message
 ``bar`` to the topic ``/test/mqttools/foo``.
 
-.. code-block:: python
+.. code-block:: text
 
    $ mqttools publish /test/mqttools/foo bar
    Topic:   b'/test/mqttools/foo'
