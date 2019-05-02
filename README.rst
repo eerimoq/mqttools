@@ -55,8 +55,11 @@ An example connecting to an MQTT broker, subscribing to the topic
 
 .. code-block:: python
 
+   import asyncio
+   import mqttools
+
    async def subscriber():
-       client = Client('test.mosquitto.org', 1883, b'mqttools-subscribe')
+       client = mqttools.Client('test.mosquitto.org', 1883, b'mqttools-subscribe')
 
        await client.start()
        await client.subscribe(b'/test/#', 0)
@@ -78,8 +81,11 @@ An example connecting to an MQTT broker and publishing the message
 
 .. code-block:: python
 
+   import asyncio
+   import mqttools
+
    async def publisher():
-       client = Client('test.mosquitto.org', 1883, b'mqttools-publish')
+       client = mqttools.Client('test.mosquitto.org', 1883, b'mqttools-publish')
 
        await client.start()
        await client.publish(b'/test/mqttools/foo', b'bar', 0)
