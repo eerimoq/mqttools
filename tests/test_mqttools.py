@@ -65,16 +65,6 @@ class Broker(threading.Thread):
         client.close()
 
 
-class Client(mqttools.Client):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.queue = queue.Queue()
-
-    def on_message(self, topic, message):
-        self.queue.put((topic, message))
-
-
 class MQTToolsTest(unittest.TestCase):
 
     def setUp(self):
@@ -92,7 +82,7 @@ class MQTToolsTest(unittest.TestCase):
         self.assertEqual(Broker.ACTUAL_DATA_STREAM, Broker.EXPECTED_DATA_STREAM)
 
     def run_until_complete(self, coro):
-        self.loop.run_until_complete(coro)
+        return self.loop.run_until_complete(coro)
 
     def test_start_stop(self):
         Broker.EXPECTED_DATA_STREAM = [
@@ -135,14 +125,12 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x00')
         ]
 
-        client = Client(*self.broker.address, b'bar')
+        client = mqttools.Client(*self.broker.address, b'bar')
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe(b'/a/b', 0))
-
-        while client.queue.empty():
-            self.run_until_complete(asyncio.sleep(0.05))
-
-        self.assertEqual(client.queue.get(), (b'/a/b', b'apa'))
+        topic, message = self.run_until_complete(client.messages.get())
+        self.assertEqual(topic, b'/a/b')
+        self.assertEqual(message, b'apa')
         self.run_until_complete(client.stop())
 
     def test_publish_qos_0(self):

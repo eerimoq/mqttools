@@ -209,6 +209,7 @@ class Client(object):
         self._suback_event = asyncio.Event()
         self._pingresp_event = asyncio.Event()
         self._subscribed = set()
+        self.messages = asyncio.Queue()
 
     async def start(self):
         self._reader, self._writer = await asyncio.open_connection(
@@ -268,12 +269,9 @@ class Client(object):
     def on_connack(self):
         self._connack_event.set()
 
-    def on_publish(self, flags, payload):
+    async def on_publish(self, flags, payload):
         qos = ((flags >> 1) & 0x3)
-        self.on_message(*unpack_publish(payload, qos))
-
-    def on_message(self, topic, message):
-        LOGGER.info('Received message - Topic: %s, Message: %s', topic, message)
+        await self.messages.put(unpack_publish(payload, qos))
 
     def on_suback(self):
         self._suback_event.set()
@@ -320,7 +318,7 @@ class Client(object):
             if packet_type == ControlPacketType.CONNACK:
                 self.on_connack()
             elif packet_type == ControlPacketType.PUBLISH:
-                self.on_publish(flags, payload)
+                await self.on_publish(flags, payload)
             elif packet_type == ControlPacketType.SUBACK:
                 self.on_suback()
             elif packet_type == ControlPacketType.PINGRESP:
@@ -374,22 +372,18 @@ class Client(object):
         return packet_type, flags, data
 
 
-class SubscriberClient(Client):
-
-    def on_message(self, topic, message):
-        print(f'Topic:   {topic}')
-        print(f'Message: {message}')
-        print()
-
-
 async def subscriber(host, port, topic, qos):
-    client = SubscriberClient(host, port, b'mqttools_subscribe')
+    client = Client(host, port, b'mqttools_subscribe')
 
     await client.start()
     await client.subscribe(topic, qos)
 
     while True:
-        await asyncio.sleep(1)
+        topic, message = await client.messages.get()
+
+        print(f'Topic:   {topic}')
+        print(f'Message: {message}')
+        print()
 
 
 async def publisher(host, port, topic, message, qos):
