@@ -38,6 +38,9 @@ USER_NAME_FLAG  = 0x80
 
 CONNECTION_ACCEPTED = 0
 
+class ConnectReasonCode(enum.IntEnum):
+    SUCCESS = 0
+
 class DisconnectReasonCode(enum.IntEnum):
     NORMAL = 0
 
@@ -45,6 +48,13 @@ class DisconnectReasonCode(enum.IntEnum):
 PROTOCOL_VERSION = 5
 
 LOGGER = logging.getLogger(__name__)
+
+
+class ConnectError(Exception):
+
+    def __init__(self, reason):
+        super().__init__()
+        self.reason = reason
 
 
 def control_packet_type_to_string(control_packet_type):
@@ -142,6 +152,18 @@ def pack_connect(client_id,
         packed += pack_string(will_message)
 
     return packed
+
+
+def unpack_connack(payload):
+    flags = struct.unpack('>B', payload.read(1))[0]
+    session_present = bool(flags & 1)
+
+    try:
+        reason = ConnectReasonCode(payload.read(1)[0])
+    except ValueError:
+        pass
+
+    return session_present, reason
 
 
 def pack_disconnect():
@@ -249,6 +271,7 @@ class Client(object):
         self._pingresp_event = asyncio.Event()
         self._subscribed = set()
         self.messages = asyncio.Queue()
+        self._connect_reason = None
 
     async def start(self):
         self._reader, self._writer = await asyncio.open_connection(
@@ -292,6 +315,9 @@ class Client(object):
         await asyncio.wait_for(self._connack_event.wait(),
                                self._response_timeout)
 
+        if self._connect_reason != ConnectReasonCode.SUCCESS:
+            raise ConnectError(reason)
+
     def disconnect(self):
         self._write_packet(pack_disconnect())
 
@@ -305,7 +331,8 @@ class Client(object):
     async def publish(self, topic, message, qos):
         self._write_packet(pack_publish(topic, message, qos))
 
-    def on_connack(self):
+    def on_connack(self, payload):
+        _, self._connect_reason = unpack_connack(payload)
         self._connack_event.set()
 
     async def on_publish(self, flags, payload):
@@ -355,7 +382,7 @@ class Client(object):
                 continue
 
             if packet_type == ControlPacketType.CONNACK:
-                self.on_connack()
+                self.on_connack(payload)
             elif packet_type == ControlPacketType.PUBLISH:
                 await self.on_publish(flags, payload)
             elif packet_type == ControlPacketType.SUBACK:
