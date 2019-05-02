@@ -67,6 +67,7 @@ def control_packet_type_to_string(control_packet_type):
 
 
 def pack_string(data):
+    data = data.encode('utf-8')
     packed = struct.pack('>H', len(data))
     packed += data
 
@@ -138,7 +139,8 @@ def pack_connect(client_id,
             flags |= WILL_QOS_2
 
         payload_length += 1
-        payload_length += len(will_topic) + 2
+        packed_will_topic = pack_string(will_topic)
+        payload_length += len(packed_will_topic)
         payload_length += len(will_message) + 2
 
     packed = pack_fixed_header(ControlPacketType.CONNECT,
@@ -155,7 +157,7 @@ def pack_connect(client_id,
 
     if flags & WILL_FLAG:
         packed += pack_variable_integer(0)
-        packed += pack_string(will_topic)
+        packed += packed_will_topic
         packed += pack_binary(will_message)
 
     return packed
@@ -182,23 +184,26 @@ def pack_disconnect():
 
 
 def pack_subscribe(topic, qos):
-    packed = pack_fixed_header(ControlPacketType.SUBSCRIBE, 2, len(topic) + 6)
-    packed += struct.pack('>HBH', 1, 0, len(topic))
-    packed += topic
+    packed_topic = pack_string(topic)
+    packed = pack_fixed_header(ControlPacketType.SUBSCRIBE,
+                               2,
+                               len(packed_topic) + 4)
+    packed += struct.pack('>HB', 1, 0)
+    packed += packed_topic
     packed += struct.pack('B', qos)
 
     return packed
 
 
 def pack_publish(topic, message, qos):
-    size = len(topic) + len(message) + 3
+    packed_topic = pack_string(topic)
+    size = len(packed_topic) + len(message) + 1
 
     if qos > 0:
         size += 2
 
     packed = pack_fixed_header(ControlPacketType.PUBLISH, qos << 1, size)
-    packed += struct.pack('>H', len(topic))
-    packed += topic
+    packed += packed_topic
     packed += pack_variable_integer(0)
 
     if qos > 0:
@@ -211,7 +216,7 @@ def pack_publish(topic, message, qos):
 
 def unpack_publish(payload, qos):
     size = struct.unpack('>H', payload.read(2))[0]
-    topic = payload.read(size)
+    topic = payload.read(size).decode('utf-8')
     props_size = unpack_variable_integer(payload)
     payload.read(props_size)
 
@@ -255,7 +260,7 @@ class Client(object):
                  host,
                  port,
                  client_id,
-                 will_topic=b'',
+                 will_topic='',
                  will_message=b'',
                  will_qos=0,
                  keep_alive_s=0,
@@ -446,7 +451,7 @@ class Client(object):
 
 
 async def subscriber(host, port, topic, qos):
-    client = Client(host, port, b'mqttools_subscribe')
+    client = Client(host, port, 'mqttools_subscribe')
 
     await client.start()
     await client.subscribe(topic, qos)
@@ -456,11 +461,10 @@ async def subscriber(host, port, topic, qos):
 
         print(f'Topic:   {topic}')
         print(f'Message: {message}')
-        print()
 
 
 async def publisher(host, port, topic, message, qos):
-    client = Client(host, port, b'mqttools_publish')
+    client = Client(host, port, 'mqttools_publish')
 
     await client.start()
 
@@ -475,14 +479,14 @@ async def publisher(host, port, topic, message, qos):
 def _do_subscribe(args):
     asyncio.run(subscriber(args.host,
                            args.port,
-                           args.topic.encode('ascii'),
+                           args.topic,
                            args.qos))
 
 
 def _do_publish(args):
     asyncio.run(publisher(args.host,
                           args.port,
-                          args.topic.encode('ascii'),
+                          args.topic,
                           args.message.encode('ascii'),
                           args.qos))
 

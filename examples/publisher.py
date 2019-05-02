@@ -2,10 +2,11 @@ import asyncio
 import mqttools
 
 async def publisher():
-    client = mqttools.Client('test.mosquitto.org', 1883, b'mqttools-publish')
+    client = mqttools.Client('test.mosquitto.org', 1883, 'mqttools-publish')
 
     await client.start()
-    await client.publish(b'/test/mqttools/foo', b'bar', 0)
+    await client.publish('/test/mqttools/foo', b'bar', 0)
     await client.stop()
+    print("Successfully published b'bar' on /test/mqttools/foo.")
 
 asyncio.run(publisher())

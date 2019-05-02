@@ -31,10 +31,10 @@ An example connecting to an MQTT broker, subscribing to the topic
 .. code-block:: text
 
    $ mqttools subscribe /test/#
-   Topic:   b'/test'
+   Topic:   /test
    Message: b'11'
 
-   Topic:   b'/test/mqttools/foo'
+   Topic:   /test/mqttools/foo
    Message: b'bar'
 
 Publish
@@ -46,7 +46,7 @@ An example connecting to an MQTT broker and publishing the message
 .. code-block:: text
 
    $ mqttools publish /test/mqttools/foo bar
-   Topic:   b'/test/mqttools/foo'
+   Topic:   /test/mqttools/foo
    Message: b'bar'
    QoS:     0
 
@@ -65,17 +65,16 @@ An example connecting to an MQTT broker, subscribing to the topic
    import mqttools
 
    async def subscriber():
-       client = mqttools.Client('test.mosquitto.org', 1883, b'mqttools-subscribe')
+       client = mqttools.Client('test.mosquitto.org', 1883, 'mqttools-subscribe')
 
        await client.start()
-       await client.subscribe(b'/test/#', 0)
+       await client.subscribe('/test/#', 0)
 
        while True:
            topic, message = await client.messages.get()
 
            print(f'Topic:   {topic}')
            print(f'Message: {message}')
-           print()
 
    asyncio.run(subscriber())
 
@@ -91,10 +90,10 @@ An example connecting to an MQTT broker and publishing the message
    import mqttools
 
    async def publisher():
-       client = mqttools.Client('test.mosquitto.org', 1883, b'mqttools-publish')
+       client = mqttools.Client('test.mosquitto.org', 1883, 'mqttools-publish')
 
        await client.start()
-       await client.publish(b'/test/mqttools/foo', b'bar', 0)
+       await client.publish('/test/mqttools/foo', b'bar', 0)
        await client.stop()
 
    asyncio.run(publisher())

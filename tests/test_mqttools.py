@@ -94,7 +94,7 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x02\x00\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, b'bar')
+        client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
         self.run_until_complete(client.stop())
 
@@ -114,11 +114,11 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x02\x00\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, b'bar')
+        client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.subscribe(b'/a/b', 0))
+        self.run_until_complete(client.subscribe('/a/b', 0))
         topic, message = self.run_until_complete(client.messages.get())
-        self.assertEqual(topic, b'/a/b')
+        self.assertEqual(topic, '/a/b')
         self.assertEqual(message, b'apa')
         self.run_until_complete(client.stop())
 
@@ -134,9 +134,9 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x02\x00\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, b'bar')
+        client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.publish(b'/a/b', b'apa', 0))
+        self.run_until_complete(client.publish('/a/b', b'apa', 0))
         self.run_until_complete(client.stop())
 
 
