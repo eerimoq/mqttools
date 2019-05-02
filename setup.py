@@ -30,5 +30,5 @@ setuptools.setup(
     ],
     test_suite="tests",
     entry_points={
-        'console_scripts': ['mqttools=mqttools.__init__:_main']
+        'console_scripts': ['mqttools=mqttools.__init__:main']
     })
