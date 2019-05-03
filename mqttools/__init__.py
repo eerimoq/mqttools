@@ -101,6 +101,10 @@ PROTOCOL_VERSION = 5
 LOGGER = logging.getLogger(__name__)
 
 
+class Error(Exception):
+    pass
+
+
 class ConnectError(Exception):
 
     def __init__(self, reason):
@@ -176,7 +180,7 @@ def pack_connect(client_id,
                  will_qos,
                  keep_alive_s):
     if bool(len(will_topic)) != bool(len(will_message)):
-        raise Exception()
+        raise Error('Bad will.')
 
     flags = CLEAN_START
     payload_length = len(client_id) + 2
@@ -234,19 +238,25 @@ def pack_disconnect():
     return packed
 
 
-def pack_subscribe(topic, qos):
+def pack_subscribe(topic, qos, packet_identifier):
     packed_topic = pack_string(topic)
     packed = pack_fixed_header(ControlPacketType.SUBSCRIBE,
                                2,
                                len(packed_topic) + 4)
-    packed += struct.pack('>HB', 1, 0)
+    packed += struct.pack('>HB', packet_identifier, 0)
     packed += packed_topic
     packed += struct.pack('B', qos)
 
     return packed
 
 
-def pack_publish(topic, message, qos):
+def unpack_suback(payload):
+    packet_identifier = struct.unpack('>H', payload.read(2))[0]
+
+    return packet_identifier
+
+
+def pack_publish(topic, message, qos, packet_identifier):
     packed_topic = pack_string(topic)
     size = len(packed_topic) + len(message) + 1
 
@@ -255,11 +265,11 @@ def pack_publish(topic, message, qos):
 
     packed = pack_fixed_header(ControlPacketType.PUBLISH, qos << 1, size)
     packed += packed_topic
-    packed += pack_variable_integer(0)
 
     if qos > 0:
-        packed += b'\x00\x01'
+        packed += struct.pack('>H', packet_identifier)
 
+    packed += pack_variable_integer(0)
     packed += message
 
     return packed
@@ -302,6 +312,32 @@ def pack_ping():
     return pack_fixed_header(ControlPacketType.PINGREQ, 0, 0)
 
 
+class Transaction(object):
+
+    def __init__(self, client):
+        self.packet_identifier = None
+        self._event = asyncio.Event()
+        self._client = client
+
+    def __enter__(self):
+        self.packet_identifier = self._client.alloc_packet_identifier()
+        self._client.transactions[self.packet_identifier] = self
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        if self.packet_identifier in self._client.transactions:
+            del self._client.transactions[self.packet_identifier]
+
+    async def wait_until_completed(self):
+        await asyncio.wait_for(self._event.wait(),
+                               self._client.response_timeout)
+
+    def mark_completed(self):
+        del self._client.transactions[self.packet_identifier]
+        self._event.set()
+
+
 class Client(object):
     """An MQTT client that reconnects on communication failure.
 
@@ -323,18 +359,19 @@ class Client(object):
         self._will_message = will_message
         self._will_qos = will_qos
         self._keep_alive_s = keep_alive_s
-        self._response_timeout = response_timeout
+        self.response_timeout = response_timeout
         self._reader = None
         self._writer = None
         self._monitor_task = None
         self._reader_task = None
         self._keep_alive_task = None
         self._connack_event = asyncio.Event()
-        self._suback_event = asyncio.Event()
         self._pingresp_event = asyncio.Event()
+        self.transactions = {}
         self._subscribed = set()
         self.messages = asyncio.Queue()
         self._connect_reason = None
+        self._next_packet_identifier = 1
 
     async def start(self):
         self._reader, self._writer = await asyncio.open_connection(
@@ -376,7 +413,7 @@ class Client(object):
                                         self._will_qos,
                                         self._keep_alive_s))
         await asyncio.wait_for(self._connack_event.wait(),
-                               self._response_timeout)
+                               self.response_timeout)
 
         if self._connect_reason != ConnectReasonCode.SUCCESS:
             raise ConnectError(reason)
@@ -385,14 +422,22 @@ class Client(object):
         self._write_packet(pack_disconnect())
 
     async def subscribe(self, topic, qos):
-        self._suback_event.clear()
-        self._write_packet(pack_subscribe(topic, qos))
-        await asyncio.wait_for(self._suback_event.wait(),
-                               self._response_timeout)
-        self._subscribed.add((topic, qos))
+        with Transaction(self) as transaction:
+            self._write_packet(pack_subscribe(topic,
+                                              qos,
+                                              transaction.packet_identifier))
+            await transaction.wait_until_completed()
+            self._subscribed.add((topic, qos))
 
     async def publish(self, topic, message, qos):
-        self._write_packet(pack_publish(topic, message, qos))
+        if qos > 0:
+            raise Error('Only QoS 0 is supported.')
+
+        with Transaction(self) as transaction:
+            self._write_packet(pack_publish(topic,
+                                            message,
+                                            qos,
+                                            transaction.packet_identifier))
 
     def on_connack(self, payload):
         _, self._connect_reason = unpack_connack(payload)
@@ -402,8 +447,15 @@ class Client(object):
         qos = ((flags >> 1) & 0x3)
         await self.messages.put(unpack_publish(payload, qos))
 
-    def on_suback(self):
-        self._suback_event.set()
+    def on_suback(self, payload):
+        packet_identifier = unpack_suback(payload)
+
+        if packet_identifier in self.transactions:
+            self.transactions[packet_identifier].mark_completed()
+        else:
+            LOGGER.debug(
+                'Discarding unexpected SUBACK packet with identifier %d.',
+                packet_identifier)
 
     def on_pingresp(self):
         self._pingresp_event.set()
@@ -449,7 +501,7 @@ class Client(object):
             elif packet_type == ControlPacketType.PUBLISH:
                 await self.on_publish(flags, payload)
             elif packet_type == ControlPacketType.SUBACK:
-                self.on_suback()
+                self.on_suback(payload)
             elif packet_type == ControlPacketType.PINGRESP:
                 self.on_pingresp()
             else:
@@ -472,7 +524,7 @@ class Client(object):
 
                 try:
                     await asyncio.wait_for(self._pingresp_event.wait(),
-                                           self._response_timeout)
+                                           self.response_timeout)
                 except asyncio.TimeoutError:
                     LOGGER.warning('Timeout waiting for ping response.')
 
@@ -499,6 +551,19 @@ class Client(object):
         LOGGER.debug('Received packet %s from the broker.', data)
 
         return packet_type, flags, BytesIO(data)
+
+    def alloc_packet_identifier(self):
+        packet_identifier = self._next_packet_identifier
+
+        if packet_identifier in self.transactions:
+            raise Error('No packet identifier available.')
+
+        self._next_packet_identifier += 1
+
+        if self._next_packet_identifier == 65536:
+            self._next_packet_identifier = 1
+
+        return packet_identifier
 
 
 async def subscriber(host, port, topic, qos):

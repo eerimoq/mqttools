@@ -5,7 +5,13 @@ async def subscriber():
     client = mqttools.Client('test.mosquitto.org', 1883, 'mqttools-subscribe')
 
     await client.start()
-    await client.subscribe('/test/#', 0)
+
+    # Subscribe to three topics in parallel.
+    await asyncio.gather(
+        client.subscribe('$SYS/broker/uptime', 0),
+        client.subscribe('$SYS/broker/bytes/sent', 0),
+        client.subscribe('/test/mqttools/foo', 0)
+    )
 
     while True:
         topic, message = await client.messages.get()

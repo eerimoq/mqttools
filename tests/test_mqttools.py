@@ -108,6 +108,10 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\x82\n\x00\x01\x00\x00\x04/a/b\x00'),
             # SUBACK
             ('s2c', b'\x90\x04\x00\x01\x00\x00'),
+            # SUBSCRIBE
+            ('c2s', b'\x82\n\x00\x02\x00\x00\x04/a/c\x00'),
+            # SUBACK
+            ('s2c', b'\x90\x04\x00\x02\x00\x00'),
             # PUBLISH
             ('s2c', b'\x30\x0a\x00\x04/a/b\x00apa'),
             # DISCONNECT
@@ -117,6 +121,7 @@ class MQTToolsTest(unittest.TestCase):
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe('/a/b', 0))
+        self.run_until_complete(client.subscribe('/a/c', 0))
         topic, message = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/a/b')
         self.assertEqual(message, b'apa')
