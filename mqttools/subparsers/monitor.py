@@ -228,8 +228,4 @@ def add_subparser(subparsers):
         '--subscribe',
         action='append',
         help='Subscribe to given topic <topic>[:<qos>]. QoS is 0 by default.')
-    subparser.add_argument(
-        '--subscribe-file',
-        help=('Subscribe to all topics in given file. Same format as --subscribe. '
-              'One topic per line.'))
     subparser.set_defaults(func=_do_monitor)
