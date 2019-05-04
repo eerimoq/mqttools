@@ -144,6 +144,48 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.publish('/a/b', b'apa', 0))
         self.run_until_complete(client.stop())
 
+    def test_publish_qos_1(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x32\x0c\x00\x04/a/b\x00\x01\x00apa'),
+            # PUBACK
+            ('s2c', b'\x40\x02\x00\x01'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address, 'bar')
+        self.run_until_complete(client.start())
+        self.run_until_complete(client.publish('/a/b', b'apa', 1))
+        self.run_until_complete(client.stop())
+
+    def test_publish_qos_2(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x34\x0c\x00\x04/a/b\x00\x01\x00apa'),
+            # PUBREC
+            ('s2c', b'\x50\x02\x00\x01'),
+            # PUBREL
+            ('c2s', b'\x62\x03\x00\x01\x00'),
+            # PUBCOMP
+            ('s2c', b'\x70\x02\x00\x01'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address, 'bar')
+        self.run_until_complete(client.start())
+        self.run_until_complete(client.publish('/a/b', b'apa', 2))
+        self.run_until_complete(client.stop())
+
 
 logging.basicConfig(level=logging.DEBUG)
 
