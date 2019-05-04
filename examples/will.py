@@ -2,7 +2,7 @@ import asyncio
 import mqttools
 
 async def will():
-    client = mqttools.Client('test.mosquitto.org',
+    client = mqttools.Client('broker.hivemq.com',
                              1883,
                              'mqttools-will',
                              '/my/will/topic',

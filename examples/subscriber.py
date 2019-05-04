@@ -2,7 +2,7 @@ import asyncio
 import mqttools
 
 async def subscriber():
-    client = mqttools.Client('test.mosquitto.org', 1883, 'mqttools-subscribe')
+    client = mqttools.Client('broker.hivemq.com', 1883, 'mqttools-subscribe')
 
     await client.start()
 

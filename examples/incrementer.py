@@ -2,7 +2,7 @@ import asyncio
 import mqttools
 
 
-HOST = 'test.mosquitto.org'
+HOST = 'broker.hivemq.com'
 PORT = 1883
 
 

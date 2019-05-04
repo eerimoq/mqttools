@@ -871,8 +871,8 @@ def main():
     subparser = subparsers.add_parser('subscribe',
                                       description='Subscribe for given topic.')
     subparser.add_argument('--host',
-                           default='test.mosquitto.org',
-                           help='Broker host (default: test.mosquitto.org).')
+                           default='broker.hivemq.com',
+                           help='Broker host (default: broker.hivemq.com).')
     subparser.add_argument('--port',
                            type=int,
                            default=1883,
@@ -893,8 +893,8 @@ def main():
     subparser = subparsers.add_parser('publish',
                                       description='Publish given topic.')
     subparser.add_argument('--host',
-                           default='test.mosquitto.org',
-                           help='Broker host (default: test.mosquitto.org).')
+                           default='broker.hivemq.com',
+                           help='Broker host (default: broker.hivemq.com).')
     subparser.add_argument('--port',
                            type=int,
                            default=1883,

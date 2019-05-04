@@ -65,7 +65,7 @@ An example connecting to an MQTT broker, subscribing to the topic
    import mqttools
 
    async def subscriber():
-       client = mqttools.Client('test.mosquitto.org', 1883, 'mqttools-subscribe')
+       client = mqttools.Client('broker.hivemq.com', 1883, 'mqttools-subscribe')
 
        await client.start()
        await client.subscribe('/test/#', 0)
@@ -90,7 +90,7 @@ An example connecting to an MQTT broker and publishing the message
    import mqttools
 
    async def publisher():
-       client = mqttools.Client('test.mosquitto.org', 1883, 'mqttools-publish')
+       client = mqttools.Client('broker.hivemq.com', 1883, 'mqttools-publish')
 
        await client.start()
        await client.publish('/test/mqttools/foo', b'bar', 0)
