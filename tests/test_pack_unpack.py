@@ -6,7 +6,7 @@ import binascii
 import queue
 import socket
 
-import mqttools
+from mqttools.client import pack_connect
 
 
 class MQTToolsPackUnpackTest(unittest.TestCase):
@@ -30,7 +30,7 @@ class MQTToolsPackUnpackTest(unittest.TestCase):
         ]
 
         for args, expected_packed in datas:
-            packed = mqttools.pack_connect(*args)
+            packed = pack_connect(*args)
             self.assertEqual(packed, expected_packed)
 
 

@@ -219,7 +219,7 @@ class MQTToolsTest(unittest.TestCase):
                 mqttools.main()
 
         self.assertIn("Topic:   /a/b\n"
-                      "Message: b'apa'\n"
+                      "Message: apa\n"
                       "QoS:     0\n",
                       stdout.getvalue())
 
