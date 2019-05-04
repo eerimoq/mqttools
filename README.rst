@@ -25,8 +25,8 @@ Command line
 Subscribe
 ^^^^^^^^^
 
-An example connecting to an MQTT broker, subscribing to the topic
-``/test/#``, and printing all published messaged.
+Connect to given MQTT broker and subscribe to a topic. All received
+messages are printed to standard output.
 
 .. code-block:: text
 
@@ -40,8 +40,7 @@ An example connecting to an MQTT broker, subscribing to the topic
 Publish
 ^^^^^^^
 
-An example connecting to an MQTT broker and publishing the message
-``bar`` to the topic ``/test/mqttools/foo``.
+Connect to given MQTT broker and publish a message to a topic.
 
 .. code-block:: text
 
@@ -49,6 +48,24 @@ An example connecting to an MQTT broker and publishing the message
    Topic:   /test/mqttools/foo
    Message: b'bar'
    QoS:     0
+
+Monitor
+^^^^^^^
+
+Connect to given MQTT broker and monitor given topics in a text based
+user interface.
+
+.. code-block:: text
+
+   $ mqttools monitor --subscribe /test/#
+
+.. image:: https://github.com/eerimoq/mqttools/raw/master/docs/monitor.png
+
+The menu at the bottom of the monitor shows the available commands.
+
+- Quit: Quit the monitor. Ctrl-C can be used as well.
+
+- Play/Pause: Toggle between playing and paused (or running and freezed).
 
 Scripting
 ---------
