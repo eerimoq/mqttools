@@ -1,3 +1,4 @@
+import sys
 import logging
 import asyncio
 import unittest
@@ -5,6 +6,8 @@ import threading
 import binascii
 import queue
 import socket
+from unittest.mock import patch
+from io import StringIO
 
 import mqttools
 
@@ -31,7 +34,7 @@ class Broker(threading.Thread):
         return self._listener.getsockname()
 
     def wait_for_client_closed(self):
-        self._client_closed.get()
+        self._client_closed.get(timeout=1)
 
     def run(self):
         while True:
@@ -75,10 +78,12 @@ class MQTToolsTest(unittest.TestCase):
         self.broker = Broker()
         self.broker.daemon = True
         self.broker.start()
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
 
     def tearDown(self):
         self.broker.wait_for_client_closed()
+        self.loop.close()
         self.assertEqual(Broker.ACTUAL_DATA_STREAM, Broker.EXPECTED_DATA_STREAM)
 
     def run_until_complete(self, coro):
@@ -185,6 +190,38 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.start())
         self.run_until_complete(client.publish('/a/b', b'apa', 2))
         self.run_until_complete(client.stop())
+
+    def test_command_line_publish_qos_0(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x1d\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x10mqttools_publish'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x30\x0a\x00\x04/a/b\x00apa'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        argv = [
+            'mqttools',
+            'publish',
+            '--host', self.broker.address[0],
+            '--port', str(self.broker.address[1]),
+            '/a/b',
+            'apa'
+        ]
+
+        stdout = StringIO()
+
+        with patch('sys.stdout', stdout):
+            with patch('sys.argv', argv):
+                mqttools.main()
+
+        self.assertIn("Topic:   /a/b\n"
+                      "Message: b'apa'\n"
+                      "QoS:     0\n",
+                      stdout.getvalue())
 
 
 logging.basicConfig(level=logging.DEBUG)

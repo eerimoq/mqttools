@@ -248,9 +248,6 @@ def pack_connect(client_id,
                  will_message,
                  will_qos,
                  keep_alive_s):
-    if bool(len(will_topic)) != bool(len(will_message)):
-        raise Error('Bad will.')
-
     flags = CLEAN_START
     payload_length = len(client_id) + 2
 
