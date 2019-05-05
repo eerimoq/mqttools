@@ -32,10 +32,10 @@ messages are printed to standard output.
 
    $ mqttools subscribe /test/#
    Topic:   /test
-   Message: b'11'
+   Message: 11
 
    Topic:   /test/mqttools/foo
-   Message: b'bar'
+   Message: bar
 
 Publish
 ^^^^^^^
@@ -46,7 +46,7 @@ Connect to given MQTT broker and publish a message to a topic.
 
    $ mqttools publish /test/mqttools/foo bar
    Topic:   /test/mqttools/foo
-   Message: b'bar'
+   Message: bar
    QoS:     0
 
 Monitor
@@ -57,7 +57,7 @@ user interface.
 
 .. code-block:: text
 
-   $ mqttools monitor --subscribe /test/#
+   $ mqttools monitor /test/#
 
 .. image:: https://github.com/eerimoq/mqttools/raw/master/docs/monitor.png
 

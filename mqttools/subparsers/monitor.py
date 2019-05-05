@@ -225,7 +225,7 @@ def add_subparser(subparsers):
                            default=1883,
                            help='Broker port (default: 1883).')
     subparser.add_argument(
-        '--subscribe',
-        action='append',
-        help='Subscribe to given topic <topic>[:<qos>]. QoS is 0 by default.')
+        'subscribe',
+        nargs='*',
+        help='Subscribe to given topic(s) <topic>[:<qos>]. QoS is 0 by default.')
     subparser.set_defaults(func=_do_monitor)
