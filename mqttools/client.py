@@ -1,3 +1,4 @@
+import os
 import logging
 import asyncio
 import struct
@@ -66,6 +67,36 @@ class ConnectReasonCode(enum.IntEnum):
     CONNECTION_RATE_EXCEEDED             = 159
 
 
+class PropertyIds(enum.IntEnum):
+    PAYLOAD_FORMAT_INDICATOR          = 1
+    MESSAGE_EXPIRY_INTERVAL           = 2
+    CONTENT_TYPE                      = 3
+    RESPONSE_TOPIC                    = 8
+    CORRELATION_DATA                  = 9
+    SUBSCRIPTION_IDENTIFIER           = 11
+    SESSION_EXPIRY_INTERVAL           = 17
+    ASSIGNED_CLIENT_IDENTIFIER        = 18
+    SERVER_KEEP_ALIVE                 = 19
+    AUTHENTICATION_METHOD             = 21
+    AUTHENTICATION_DATA               = 22
+    REQUEST_PROBLEM_INFORMATION       = 23
+    WILL_DELAY_INTERVAL               = 24
+    REQUEST_RESPONSE_INFORMATION      = 25
+    RESPONSE_INFORMATION              = 26
+    SERVER_REFERENCE                  = 28
+    REASON_STRING                     = 31
+    RECEIVE_MAXIMUM                   = 33
+    TOPIC_ALIAS_MAXIMUM               = 34
+    TOPIC_ALIAS                       = 35
+    MAXIMUM_QOS                       = 36
+    RETAIN_AVAILABLE                  = 37
+    USER_PROPERTY                     = 38
+    MAXIMUM_PACKET_SIZE               = 39
+    WILDCARD_SUBSCRIPTION_AVAILABLE   = 40
+    SUBSCRIPTION_IDENTIFIER_AVAILABLE = 41
+    SHARED_SUBSCRIPTION_AVAILABLE     = 42
+
+
 class DisconnectReasonCode(enum.IntEnum):
     NORMAL_DISCONNECTION                   = 0
     DISCONNECT_WITH_WILL_MESSAGE           = 4
@@ -99,27 +130,27 @@ class DisconnectReasonCode(enum.IntEnum):
 
 
 class PubackReasonCode(enum.IntEnum):
-    SUCCESS = 0
-    NO_MATCHING_SUBSCRIBERS = 16
-    UNSPECIFIED_ERROR = 128
+    SUCCESS                       = 0
+    NO_MATCHING_SUBSCRIBERS       = 16
+    UNSPECIFIED_ERROR             = 128
     IMPLEMENTATION_SPECIFIC_ERROR = 131
-    NOT_AUTHORIZED = 135
-    TOPIC_NAME_INVALID = 144
-    PACKET_IDENTIFIER_IN_USE = 145
-    QUOTA_EXCEEDED = 151
-    PAYLOAD_FORMAT_INVALID = 153
+    NOT_AUTHORIZED                = 135
+    TOPIC_NAME_INVALID            = 144
+    PACKET_IDENTIFIER_IN_USE      = 145
+    QUOTA_EXCEEDED                = 151
+    PAYLOAD_FORMAT_INVALID        = 153
 
 
 class PubrecReasonCode(enum.IntEnum):
-    SUCCESS = 0
-    NO_MATCHING_SUBSCRIBERS = 16
-    UNSPECIFIED_ERROR = 128
+    SUCCESS                       = 0
+    NO_MATCHING_SUBSCRIBERS       = 16
+    UNSPECIFIED_ERROR             = 128
     IMPLEMENTATION_SPECIFIC_ERROR = 131
-    NOT_AUTHORIZED = 135
-    TOPIC_NAME_INVALID = 144
-    PACKET_IDENTIFIER_IN_USE = 145
-    QUOTA_EXCEEDED = 151
-    PAYLOAD_FORMAT_INVALID = 153
+    NOT_AUTHORIZED                = 135
+    TOPIC_NAME_INVALID            = 144
+    PACKET_IDENTIFIER_IN_USE      = 145
+    QUOTA_EXCEEDED                = 151
+    PAYLOAD_FORMAT_INVALID        = 153
 
 
 class PubrelReasonCode(enum.IntEnum):
@@ -130,7 +161,6 @@ class PubrelReasonCode(enum.IntEnum):
 class PubcompReasonCode(enum.IntEnum):
     SUCCESS = 0
     PACKET_IDENTIFIER_NOT_FOUND = 146
-
 
 # MQTT 5.0
 PROTOCOL_VERSION = 5
@@ -167,6 +197,15 @@ class PublishError(Exception):
         return f'{self.reason.name}({self.reason.value})'
 
 
+def is_data_available(payload):
+    pos = payload.tell()
+    payload.seek(0, os.SEEK_END)
+    at_end = (pos < payload.tell())
+    payload.seek(pos)
+
+    return at_end
+
+
 def control_packet_type_to_string(control_packet_type):
     try:
         name = ControlPacketType(control_packet_type).name
@@ -184,11 +223,116 @@ def pack_string(data):
     return packed
 
 
+def unpack_string(payload):
+    size = unpack_u16(payload)
+
+    return payload.read(size).decode('utf-8')
+
+
+def unpack_u32(payload):
+    return struct.unpack('>I', payload.read(4))[0]
+
+
+def unpack_u16(payload):
+    return struct.unpack('>H', payload.read(2))[0]
+
+
+def unpack_u8(payload):
+    return payload.read(1)[0]
+
+
+def unpack_property(property_id, payload):
+    try:
+        return {
+            PropertyIds.PAYLOAD_FORMAT_INDICATOR: unpack_u8,
+            PropertyIds.MESSAGE_EXPIRY_INTERVAL: unpack_u32,
+            PropertyIds.CONTENT_TYPE: unpack_string,
+            PropertyIds.RESPONSE_TOPIC: unpack_string,
+            PropertyIds.CORRELATION_DATA: unpack_binary,
+            PropertyIds.SUBSCRIPTION_IDENTIFIER: unpack_variable_integer,
+            PropertyIds.SESSION_EXPIRY_INTERVAL: unpack_u32,
+            PropertyIds.ASSIGNED_CLIENT_IDENTIFIER: unpack_string,
+            PropertyIds.SERVER_KEEP_ALIVE: unpack_u16,
+            PropertyIds.AUTHENTICATION_METHOD: unpack_string,
+            PropertyIds.AUTHENTICATION_DATA: unpack_binary,
+            PropertyIds.REQUEST_PROBLEM_INFORMATION: unpack_u8,
+            PropertyIds.WILL_DELAY_INTERVAL: unpack_u32,
+            PropertyIds.REQUEST_RESPONSE_INFORMATION: unpack_u8,
+            PropertyIds.RESPONSE_INFORMATION: unpack_string,
+            PropertyIds.SERVER_REFERENCE: unpack_string,
+            PropertyIds.REASON_STRING: unpack_string,
+            PropertyIds.RECEIVE_MAXIMUM: unpack_u16,
+            PropertyIds.TOPIC_ALIAS_MAXIMUM: unpack_u16,
+            PropertyIds.TOPIC_ALIAS: unpack_u16,
+            PropertyIds.MAXIMUM_QOS: unpack_u8,
+            PropertyIds.RETAIN_AVAILABLE: unpack_u8,
+            PropertyIds.USER_PROPERTY: unpack_string,
+            PropertyIds.MAXIMUM_PACKET_SIZE: unpack_u32,
+            PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE: unpack_u8,
+            PropertyIds.SUBSCRIPTION_IDENTIFIER_AVAILABLE: unpack_u8,
+            PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: unpack_u8
+        }[property_id](payload)
+    except ValueError:
+        return None
+
+
+def unpack_properties(packet_name,
+                      allowed_property_ids,
+                      payload):
+    """Return a dictionary of unpacked properties, or None on failure.
+
+    """
+
+    end_pos = unpack_variable_integer(payload)
+    end_pos += payload.tell()
+    properties = {}
+
+    while payload.tell() < end_pos:
+        buf = payload.read(1)
+
+        if not buf:
+            LOGGER.info('Not engouh property data in %s.', packet_name)
+            break
+
+        property_id = buf[0]
+
+        if property_id not in allowed_property_ids:
+            LOGGER.info('Invalid property identifier %d in %s.',
+                        property_id,
+                        packet_name)
+            break
+
+        property_id = PropertyIds(property_id)
+        value = unpack_property(property_id, payload)
+
+        if value is None:
+            return None
+
+        properties[property_id] = value
+
+    # Log the properties.
+    LOGGER.debug('%s properties:', packet_name)
+
+    for identifier, value in properties.items():
+        LOGGER.debug('  %s(%d): %s',
+                     identifier.name,
+                     identifier.value,
+                     value)
+
+    return properties
+
+
 def pack_binary(data):
     packed = struct.pack('>H', len(data))
     packed += data
 
     return packed
+
+
+def unpack_binary(payload):
+    size = unpack_u16(payload)
+
+    return payload.read(size)
 
 
 def pack_variable_integer(value):
@@ -215,7 +359,7 @@ def unpack_variable_integer(payload):
     byte = 0x80
 
     while (byte & 0x80) == 0x80:
-        byte = payload.read(1)[0]
+        byte = unpack_u8(payload)
         value += ((byte & 0x7f) * multiplier)
         multiplier <<= 7
 
@@ -282,16 +426,39 @@ def pack_connect(client_id,
 
 
 def unpack_connack(payload):
-    flags = payload.read(1)[0]
+    flags = unpack_u8(payload)
     session_present = bool(flags & 1)
-    reason = payload.read(1)[0]
+    reason = unpack_u8(payload)
 
     try:
         reason = ConnectReasonCode(reason)
     except ValueError:
         raise Error(f'Invalid CONNACK reason {reason}')
 
-    return session_present, reason
+    properties = unpack_properties(
+        'CONNACK',
+        [
+            PropertyIds.SESSION_EXPIRY_INTERVAL,
+            PropertyIds.ASSIGNED_CLIENT_IDENTIFIER,
+            PropertyIds.SERVER_KEEP_ALIVE,
+            PropertyIds.AUTHENTICATION_METHOD,
+            PropertyIds.AUTHENTICATION_DATA,
+            PropertyIds.RESPONSE_INFORMATION,
+            PropertyIds.SERVER_REFERENCE,
+            PropertyIds.REASON_STRING,
+            PropertyIds.RECEIVE_MAXIMUM,
+            PropertyIds.TOPIC_ALIAS_MAXIMUM,
+            PropertyIds.MAXIMUM_QOS,
+            PropertyIds.RETAIN_AVAILABLE,
+            PropertyIds.USER_PROPERTY,
+            PropertyIds.MAXIMUM_PACKET_SIZE,
+            PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE,
+            PropertyIds.SUBSCRIPTION_IDENTIFIER_AVAILABLE,
+            PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE
+        ],
+        payload)
+
+    return session_present, reason, properties
 
 
 def pack_disconnect():
@@ -315,9 +482,15 @@ def pack_subscribe(topic, qos, packet_identifier):
 
 
 def unpack_suback(payload):
-    packet_identifier = struct.unpack('>H', payload.read(2))[0]
+    packet_identifier = unpack_u16(payload)
+    properties = unpack_properties('SUBACK',
+                                   [
+                                       PropertyIds.REASON_STRING,
+                                       PropertyIds.USER_PROPERTY
+                                   ],
+                                   payload)
 
-    return packet_identifier
+    return packet_identifier, properties
 
 
 def pack_publish(topic, message, qos, packet_identifier):
@@ -340,10 +513,23 @@ def pack_publish(topic, message, qos, packet_identifier):
 
 
 def unpack_publish(payload, qos):
-    size = struct.unpack('>H', payload.read(2))[0]
+    size = unpack_u16(payload)
     topic = payload.read(size).decode('utf-8')
-    props_size = unpack_variable_integer(payload)
-    payload.read(props_size)
+
+    if is_data_available(payload):
+        properties = unpack_properties(
+            'PUBLISH',
+            [
+                PropertyIds.PAYLOAD_FORMAT_INDICATOR,
+                PropertyIds.MESSAGE_EXPIRY_INTERVAL,
+                PropertyIds.CONTENT_TYPE,
+                PropertyIds.RESPONSE_TOPIC,
+                PropertyIds.CORRELATION_DATA,
+                PropertyIds.SUBSCRIPTION_IDENTIFIER,
+                PropertyIds.TOPIC_ALIAS,
+                PropertyIds.USER_PROPERTY
+            ],
+            payload)
 
     if qos == 0:
         message = payload.read()
@@ -355,7 +541,7 @@ def unpack_publish(payload, qos):
 
 
 def unpack_puback(payload):
-    packet_identifier = struct.unpack('>H', payload.read(2))[0]
+    packet_identifier = unpack_u16(payload)
     buf = payload.read(1)
 
     if buf:
@@ -368,11 +554,19 @@ def unpack_puback(payload):
     except ValueError:
         pass
 
+    if is_data_available(payload):
+        unpack_properties('PUBACK',
+                          [
+                              PropertyIds.REASON_STRING,
+                              PropertyIds.USER_PROPERTY
+                          ],
+                          payload)
+
     return packet_identifier, reason
 
 
 def unpack_pubrec(payload):
-    packet_identifier = struct.unpack('>H', payload.read(2))[0]
+    packet_identifier = unpack_u16(payload)
     buf = payload.read(1)
 
     if buf:
@@ -385,11 +579,19 @@ def unpack_pubrec(payload):
     except ValueError:
         pass
 
+    if is_data_available(payload):
+        unpack_properties('PUBREC',
+                          [
+                              PropertyIds.REASON_STRING,
+                              PropertyIds.USER_PROPERTY
+                          ],
+                          payload)
+
     return packet_identifier, reason
 
 
 def unpack_pubcomp(payload):
-    packet_identifier = struct.unpack('>H', payload.read(2))[0]
+    packet_identifier = unpack_u16(payload)
     buf = payload.read(1)
 
     if buf:
@@ -401,6 +603,14 @@ def unpack_pubcomp(payload):
         reason = PubcompReasonCode(reason)
     except ValueError:
         pass
+
+    if is_data_available(payload):
+        unpack_properties('PUBCOMP',
+                          [
+                              PropertyIds.REASON_STRING,
+                              PropertyIds.USER_PROPERTY
+                          ],
+                          payload)
 
     return packet_identifier, reason
 
@@ -475,7 +685,7 @@ class Client(object):
                  will_message=b'',
                  will_qos=0,
                  keep_alive_s=0,
-                 response_timeout=5,
+                 response_timeout=50,
                  **kwargs):
         self._host = host
         self._port = port
@@ -500,13 +710,17 @@ class Client(object):
         self.transactions = {}
         self._subscribed = set()
         self.messages = asyncio.Queue()
-        self._connect_reason = None
+        self._connack = None
         self._next_packet_identifier = 1
 
         if keep_alive_s == 0:
             self._ping_period_s = None
         else:
             self._ping_period_s = max(1, keep_alive_s - response_timeout - 1)
+
+    @property
+    def client_id(self):
+        return self._client_id
 
     async def start(self):
         self._reader, self._writer = await asyncio.open_connection(
@@ -561,7 +775,9 @@ class Client(object):
         except asyncio.TimeoutError:
             raise Error('Timeout waiting for CONNACK from the broker.')
 
-        if self._connect_reason != ConnectReasonCode.SUCCESS:
+        _, reason, _ = self._connack
+
+        if reason != ConnectReasonCode.SUCCESS:
             raise ConnectError(self._connect_reason)
 
     def disconnect(self):
@@ -622,7 +838,7 @@ class Client(object):
             raise Error(f'Invalid QoS {qos}.')
 
     def on_connack(self, payload):
-        _, self._connect_reason = unpack_connack(payload)
+        self._connack = unpack_connack(payload)
         self._connack_event.set()
 
     async def on_publish(self, flags, payload):
@@ -660,7 +876,7 @@ class Client(object):
                 packet_identifier)
 
     def on_suback(self, payload):
-        packet_identifier = unpack_suback(payload)
+        packet_identifier, properties = unpack_suback(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(None)
