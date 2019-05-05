@@ -219,10 +219,7 @@ class MQTToolsTest(unittest.TestCase):
             with patch('sys.argv', argv):
                 mqttools.main()
 
-        self.assertIn("Topic:   /a/b\n"
-                      "Message: apa\n"
-                      "QoS:     0\n",
-                      stdout.getvalue())
+        self.assertIn('Published 1 message(s) in', stdout.getvalue())
 
 
 logging.basicConfig(level=logging.DEBUG)

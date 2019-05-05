@@ -27,6 +27,7 @@ setuptools.setup(
     packages=find_packages(exclude=['tests']),
     install_requires=[
         'bitstruct',
+        'humanfriendly',
         'windows-curses;platform_system=="Windows"'
     ],
     test_suite="tests",
