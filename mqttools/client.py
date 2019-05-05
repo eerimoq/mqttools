@@ -724,6 +724,8 @@ class Client(object):
         self.messages = asyncio.Queue()
         self._connack = None
         self._next_packet_identifier = 1
+        self._receive_maximum = None
+        self._receive_maximum_semaphore = None
 
         if keep_alive_s == 0:
             self._ping_period_s = None
@@ -733,6 +735,10 @@ class Client(object):
     @property
     def client_id(self):
         return self._client_id
+
+    @property
+    def receive_maximum(self):
+        return self._receive_maximum
 
     async def start(self):
         self._reader, self._writer = await asyncio.open_connection(
@@ -787,7 +793,14 @@ class Client(object):
         except asyncio.TimeoutError:
             raise Error('Timeout waiting for CONNACK from the broker.')
 
-        _, reason, _ = self._connack
+        _, reason, properties = self._connack
+
+        if PropertyIds.RECEIVE_MAXIMUM in properties:
+            self._receive_maximum = properties[PropertyIds.RECEIVE_MAXIMUM]
+        else:
+            self._receive_maximum = 65535
+
+        self._receive_maximum_semaphore = asyncio.Semaphore(self._receive_maximum)
 
         if reason != ConnectReasonCode.SUCCESS:
             raise ConnectError(self._connect_reason)
@@ -811,33 +824,35 @@ class Client(object):
                                             transaction.packet_identifier))
 
     async def publish_qos_1(self, topic, message):
-        with Transaction(self) as transaction:
-            self._write_packet(pack_publish(topic,
-                                            message,
-                                            1,
-                                            transaction.packet_identifier))
-            reason = await transaction.wait_until_completed()
+        async with self._receive_maximum_semaphore:
+            with Transaction(self) as transaction:
+                self._write_packet(pack_publish(topic,
+                                                message,
+                                                1,
+                                                transaction.packet_identifier))
+                reason = await transaction.wait_until_completed()
 
-            if reason != PubackReasonCode.SUCCESS:
-                raise PublishError(reason)
+                if reason != PubackReasonCode.SUCCESS:
+                    raise PublishError(reason)
 
     async def publish_qos_2(self, topic, message):
-        with Transaction(self) as transaction:
-            self._write_packet(pack_publish(topic,
-                                            message,
-                                            2,
-                                            transaction.packet_identifier))
-            reason = await transaction.wait_for_response()
+        async with self._receive_maximum_semaphore:
+            with Transaction(self) as transaction:
+                self._write_packet(pack_publish(topic,
+                                                message,
+                                                2,
+                                                transaction.packet_identifier))
+                reason = await transaction.wait_for_response()
 
-            if reason != PubrecReasonCode.SUCCESS:
-                raise PublishError(reason)
+                if reason != PubrecReasonCode.SUCCESS:
+                    raise PublishError(reason)
 
-            self._write_packet(pack_pubrel(transaction.packet_identifier,
-                                           PubrelReasonCode.SUCCESS))
-            reason = await transaction.wait_until_completed()
+                self._write_packet(pack_pubrel(transaction.packet_identifier,
+                                               PubrelReasonCode.SUCCESS))
+                reason = await transaction.wait_until_completed()
 
-            if reason != PubcompReasonCode.SUCCESS:
-                raise PublishError(reason)
+                if reason != PubcompReasonCode.SUCCESS:
+                    raise PublishError(reason)
 
     async def publish(self, topic, message, qos):
         if qos == 0:

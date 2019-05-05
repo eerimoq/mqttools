@@ -260,23 +260,23 @@ class MQTToolsTest(unittest.TestCase):
             # PUBLISH
             ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x001'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x002'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x003'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x004'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x005'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x006'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x007'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x008'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
-            ('c2s', b'\x30\x08\x00\x04/a/b\x009'),
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
             # PUBLISH
             ('c2s', b'\x30\x08\x00\x04/a/b\x001'),
             # DISCONNECT

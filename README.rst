@@ -45,9 +45,15 @@ Connect to given MQTT broker and publish a message to a topic.
 .. code-block:: text
 
    $ mqttools publish /test/mqttools/foo bar
-   Topic:   /test/mqttools/foo
-   Message: bar
-   QoS:     0
+   Published 1 message(s) in 0 seconds from 1 concurrent task(s).
+
+Publish multiple messages as quickly as possible with ``--count`` to
+benchmark the client and the broker.
+
+.. code-block:: text
+
+   $ mqttools publish --count 100 --qos 1 /test/mqttools/foo
+   Published 100 message(s) in 0.39 seconds from 10 concurrent task(s).
 
 Monitor
 ^^^^^^^

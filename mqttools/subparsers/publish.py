@@ -6,29 +6,76 @@ from ..client import Client
 from . import try_decode
 
 
+class Counter(object):
+
+    def __init__(self, count):
+        self._lock = asyncio.Lock()
+        self._number = 0
+        self._count = count
+
+    async def get(self):
+        number = None
+
+        async with self._lock:
+            if self._number < self._count:
+                number = self._number
+                self._number += 1
+
+        return number
+
+
+def create_message_bytes(message, size, number, fmt):
+    if message is None:
+        message_bytes = fmt.format(number).encode('ascii')
+        extra = (size - len(message_bytes))
+
+        if extra > 0:
+            message_bytes += extra * b'\xa5'
+        else:
+            message_bytes = message_bytes[:size]
+    else:
+        message_bytes = message.encode('ascii')
+
+    return message_bytes
+
+
+async def worker(client, counter, qos, size, topic, message, fmt):
+    while True:
+        number = await counter.get()
+
+        if number is None:
+            break
+
+        message_bytes = create_message_bytes(message, size, number, fmt)
+        await client.publish(topic, message_bytes, qos)
+
+
 async def publisher(host, port, client_id, qos, count, size, topic, message):
     client = Client(host, port, client_id)
 
     await client.start()
 
+    fmt = '{{:0{}}}'.format(len(str(count - 1)))
     start_time = time.time()
 
-    for number in range(count):
-        if message is None:
-            message_bytes = str(number).encode('ascii')
-            extra = (size - len(message_bytes))
+    if qos == 0:
+        number_of_concurrent_tasks = 1
 
-            if extra > 0:
-                message_bytes += extra * b'\xa5'
-            else:
-                message_bytes = message_bytes[:size]
-        else:
-            message_bytes = message.encode('ascii')
-
-        await client.publish(topic, message_bytes, qos)
+        for number in range(count):
+            message_bytes = create_message_bytes(message, size, number, fmt)
+            await client.publish(topic, message_bytes, qos)
+    else:
+        counter = Counter(count)
+        number_of_concurrent_tasks = client.receive_maximum
+        await asyncio.gather(*[
+            asyncio.create_task(
+                worker(client, counter, qos, size, topic, message, fmt))
+            for _ in range(number_of_concurrent_tasks)
+        ])
 
     elapsed_time = format_timespan(time.time() - start_time)
-    print(f'Published {count} message(s) in {elapsed_time}.')
+    print(f'Published {count} message(s) in {elapsed_time} from '
+          f'{number_of_concurrent_tasks} concurrent task(s).')
 
     await client.stop()
 
@@ -68,8 +115,8 @@ def add_subparser(subparsers):
     subparser.add_argument(
         '--size',
         type=int,
-        default=50,
-        help='Generated message size (default: 50).')
+        default=10,
+        help='Generated message size (default: 10).')
     subparser.add_argument('topic', help='Topic to publish.')
     subparser.add_argument(
         'message',
