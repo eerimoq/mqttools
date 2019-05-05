@@ -26,7 +26,8 @@ setuptools.setup(
     url='https://github.com/eerimoq/mqttools',
     packages=find_packages(exclude=['tests']),
     install_requires=[
-        'bitstruct'
+        'bitstruct',
+        'windows-curses;platform_system=="Windows"'
     ],
     test_suite="tests",
     entry_points={
