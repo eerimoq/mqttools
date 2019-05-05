@@ -208,6 +208,7 @@ class MQTToolsTest(unittest.TestCase):
             'publish',
             '--host', self.broker.address[0],
             '--port', str(self.broker.address[1]),
+            '--client-id', 'mqttools_publish',
             '/a/b',
             'apa'
         ]

@@ -15,17 +15,19 @@ class QuitError(Exception):
     pass
 
 
-class MonitorClientThread(threading.Thread):
+class ClientThread(threading.Thread):
 
     def __init__(self, queue, args):
         super().__init__()
         self._queue = queue
         self._host = args.host
         self._port = args.port
+        self._client_id = args.client_id
         self._topics = args.subscribe
 
     async def main(self):
-        client = Client(self._host, self._port, 'mqttools_monitor')
+        client = Client(self._host, self._port, self._client_id)
+
         await client.start()
         await asyncio.gather(*[client.subscribe(topic, 0)
                                for topic in self._topics])
@@ -42,16 +44,13 @@ class Monitor(object):
 
     def __init__(self, stdscr, args):
         self._stdscr = stdscr
-        self._filtered_sorted_topics = []
-        self._filter = ''
-        self._compiled_filter = None
+        self._sorted_topics = []
         self._formatted_messages = {}
         self._playing = True
         self._modified = True
         self._queue = Queue()
         self._nrows, self._ncols = stdscr.getmaxyx()
-        self._received = 0
-        self._client_thread = MonitorClientThread(self._queue, args)
+        self._client_thread = ClientThread(self._queue, args)
         self._client_thread.daemon = True
         self._client_thread.start()
 
@@ -87,7 +86,7 @@ class Monitor(object):
 
         row = 1
 
-        for topic in self._filtered_sorted_topics:
+        for topic in self._sorted_topics:
             for line in self._formatted_messages[topic]:
                 self.addstr(row, 0, line)
                 row += 1
@@ -141,15 +140,8 @@ class Monitor(object):
         elif key == 'p':
             self._playing = not self._playing
 
-    def compile_filter(self):
-        try:
-            self._compiled_filter = re.compile(self._filter)
-        except:
-            self._compiled_filter = None
-
     def try_update_message(self):
         timestamp, topic, message = self._queue.get_nowait()
-        self._received += 1
         lines = []
         row_length = max(1, self._ncols - 12)
 
@@ -168,8 +160,8 @@ class Monitor(object):
         formatted += [11 * ' ' + line for line in lines]
         self._formatted_messages[topic] = formatted
 
-        if topic not in self._filtered_sorted_topics:
-            self.insort_filtered(topic)
+        if topic not in self._sorted_topics:
+            self.insort(topic)
 
     def update_messages(self):
         modified = False
@@ -199,9 +191,8 @@ class Monitor(object):
 
         return modified
 
-    def insort_filtered(self, topic):
-        if self._compiled_filter is None or self._compiled_filter.search(topic):
-            bisect.insort(self._filtered_sorted_topics, topic)
+    def insort(self, topic):
+        bisect.insort(self._sorted_topics, topic)
 
 
 def _do_monitor(args):
@@ -224,6 +215,8 @@ def add_subparser(subparsers):
                            type=int,
                            default=1883,
                            help='Broker port (default: 1883).')
+    subparser.add_argument('--client-id',
+                           help='Client id (default: mqttools-<UUID[0..14]>).')
     subparser.add_argument(
         'subscribe',
         nargs='*',

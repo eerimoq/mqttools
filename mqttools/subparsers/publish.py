@@ -4,8 +4,8 @@ from ..client import Client
 from . import try_decode
 
 
-async def publisher(host, port, topic, message, qos):
-    client = Client(host, port, 'mqttools_publish')
+async def publisher(host, port, client_id, topic, message, qos):
+    client = Client(host, port, client_id)
 
     await client.start()
 
@@ -20,6 +20,7 @@ async def publisher(host, port, topic, message, qos):
 def _do_publish(args):
     asyncio.run(publisher(args.host,
                           args.port,
+                          args.client_id,
                           args.topic,
                           args.message.encode('ascii'),
                           args.qos))
@@ -35,6 +36,8 @@ def add_subparser(subparsers):
                            type=int,
                            default=1883,
                            help='Broker port (default: 1883).')
+    subparser.add_argument('--client-id',
+                           help='Client id (default: mqttools-<UUID[0..14]>).')
     subparser.add_argument('--qos',
                            type=int,
                            default=0,

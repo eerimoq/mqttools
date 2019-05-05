@@ -1,19 +1,11 @@
 import logging
 import asyncio
-import sys
-import argparse
 import struct
 import enum
 import binascii
-import bitstruct
 from io import BytesIO
-import re
-import time
-import curses
-import bisect
-from queue import Queue
-
-from .version import __version__
+import uuid
+import bitstruct
 
 
 # Control packet types.
@@ -478,7 +470,7 @@ class Client(object):
     def __init__(self,
                  host,
                  port,
-                 client_id,
+                 client_id=None,
                  will_topic='',
                  will_message=b'',
                  will_qos=0,
@@ -486,6 +478,10 @@ class Client(object):
                  response_timeout=5):
         self._host = host
         self._port = port
+
+        if client_id is None:
+            client_id = 'mqttools-{}'.format(uuid.uuid1().hex[:14])
+
         self._client_id = client_id
         self._will_topic = will_topic
         self._will_message = will_message

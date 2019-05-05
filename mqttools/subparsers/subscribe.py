@@ -4,11 +4,8 @@ from ..client import Client
 from . import try_decode
 
 
-async def subscriber(host, port, topic, qos, keep_alive_s):
-    client = Client(host,
-                    port,
-                    'mqttools_subscribe',
-                    keep_alive_s=keep_alive_s)
+async def subscriber(host, port, client_id, topic, qos, keep_alive_s):
+    client = Client(host, port, client_id, keep_alive_s=keep_alive_s)
 
     await client.start()
     await client.subscribe(topic, qos)
@@ -23,6 +20,7 @@ async def subscriber(host, port, topic, qos, keep_alive_s):
 def _do_subscribe(args):
     asyncio.run(subscriber(args.host,
                            args.port,
+                           args.client_id,
                            args.topic,
                            args.qos,
                            args.keep_alive))
@@ -38,6 +36,8 @@ def add_subparser(subparsers):
                            type=int,
                            default=1883,
                            help='Broker port (default: 1883).')
+    subparser.add_argument('--client-id',
+                           help='Client id (default: mqttools-<UUID[0..14]>).')
     subparser.add_argument('--qos',
                            type=int,
                            default=0,

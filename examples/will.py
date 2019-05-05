@@ -4,10 +4,9 @@ import mqttools
 async def will():
     client = mqttools.Client('broker.hivemq.com',
                              1883,
-                             'mqttools-will',
-                             '/my/will/topic',
-                             b'my-will-message',
-                             0)
+                             will_topic='/my/will/topic',
+                             will_message=b'my-will-message',
+                             will_qos=0)
 
     await client.start()
     await client.stop()

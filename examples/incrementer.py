@@ -7,7 +7,7 @@ PORT = 1883
 
 
 async def main():
-    client = mqttools.Client(HOST, PORT, 'incrementer')
+    client = mqttools.Client(HOST, PORT)
     await client.start()
     print(f'Connected to {HOST}:{PORT}.')
     await client.subscribe('/mqttools/incrementer/value/request', 0)
