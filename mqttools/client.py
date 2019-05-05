@@ -172,6 +172,10 @@ class Error(Exception):
     pass
 
 
+class MalformedPacketError(Exception):
+    pass
+
+
 class ConnectError(Exception):
 
     def __init__(self, reason):
@@ -197,13 +201,26 @@ class PublishError(Exception):
         return f'{self.reason.name}({self.reason.value})'
 
 
-def is_data_available(payload):
-    pos = payload.tell()
-    payload.seek(0, os.SEEK_END)
-    at_end = (pos < payload.tell())
-    payload.seek(pos)
+class PayloadReader(BytesIO):
 
-    return at_end
+    def read(self, size):
+        data = super().read(size)
+
+        if len(data) != size:
+            raise MalformedPacketError()
+
+        return data
+
+    def read_all(self):
+        return super().read()
+
+    def is_data_available(self):
+        pos = self.tell()
+        self.seek(0, os.SEEK_END)
+        at_end = (pos < self.tell())
+        self.seek(pos)
+
+        return at_end
 
 
 def control_packet_type_to_string(control_packet_type):
@@ -226,15 +243,30 @@ def pack_string(data):
 def unpack_string(payload):
     size = unpack_u16(payload)
 
-    return payload.read(size).decode('utf-8')
+    try:
+        return payload.read(size).decode('utf-8')
+    except UnicodeDecodeError:
+        raise MalformedPacketError('String not UTF-8 encoded.')
+
+
+def pack_u32(value):
+    return struct.pack('>I', value)
 
 
 def unpack_u32(payload):
     return struct.unpack('>I', payload.read(4))[0]
 
 
+def pack_u16(value):
+    return struct.pack('>H', value)
+
+
 def unpack_u16(payload):
     return struct.unpack('>H', payload.read(2))[0]
+
+
+def pack_u8(value):
+    return struct.pack('B', value)
 
 
 def unpack_u8(payload):
@@ -242,38 +274,35 @@ def unpack_u8(payload):
 
 
 def unpack_property(property_id, payload):
-    try:
-        return {
-            PropertyIds.PAYLOAD_FORMAT_INDICATOR: unpack_u8,
-            PropertyIds.MESSAGE_EXPIRY_INTERVAL: unpack_u32,
-            PropertyIds.CONTENT_TYPE: unpack_string,
-            PropertyIds.RESPONSE_TOPIC: unpack_string,
-            PropertyIds.CORRELATION_DATA: unpack_binary,
-            PropertyIds.SUBSCRIPTION_IDENTIFIER: unpack_variable_integer,
-            PropertyIds.SESSION_EXPIRY_INTERVAL: unpack_u32,
-            PropertyIds.ASSIGNED_CLIENT_IDENTIFIER: unpack_string,
-            PropertyIds.SERVER_KEEP_ALIVE: unpack_u16,
-            PropertyIds.AUTHENTICATION_METHOD: unpack_string,
-            PropertyIds.AUTHENTICATION_DATA: unpack_binary,
-            PropertyIds.REQUEST_PROBLEM_INFORMATION: unpack_u8,
-            PropertyIds.WILL_DELAY_INTERVAL: unpack_u32,
-            PropertyIds.REQUEST_RESPONSE_INFORMATION: unpack_u8,
-            PropertyIds.RESPONSE_INFORMATION: unpack_string,
-            PropertyIds.SERVER_REFERENCE: unpack_string,
-            PropertyIds.REASON_STRING: unpack_string,
-            PropertyIds.RECEIVE_MAXIMUM: unpack_u16,
-            PropertyIds.TOPIC_ALIAS_MAXIMUM: unpack_u16,
-            PropertyIds.TOPIC_ALIAS: unpack_u16,
-            PropertyIds.MAXIMUM_QOS: unpack_u8,
-            PropertyIds.RETAIN_AVAILABLE: unpack_u8,
-            PropertyIds.USER_PROPERTY: unpack_string,
-            PropertyIds.MAXIMUM_PACKET_SIZE: unpack_u32,
-            PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE: unpack_u8,
-            PropertyIds.SUBSCRIPTION_IDENTIFIER_AVAILABLE: unpack_u8,
-            PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: unpack_u8
-        }[property_id](payload)
-    except ValueError:
-        return None
+    return {
+        PropertyIds.PAYLOAD_FORMAT_INDICATOR: unpack_u8,
+        PropertyIds.MESSAGE_EXPIRY_INTERVAL: unpack_u32,
+        PropertyIds.CONTENT_TYPE: unpack_string,
+        PropertyIds.RESPONSE_TOPIC: unpack_string,
+        PropertyIds.CORRELATION_DATA: unpack_binary,
+        PropertyIds.SUBSCRIPTION_IDENTIFIER: unpack_variable_integer,
+        PropertyIds.SESSION_EXPIRY_INTERVAL: unpack_u32,
+        PropertyIds.ASSIGNED_CLIENT_IDENTIFIER: unpack_string,
+        PropertyIds.SERVER_KEEP_ALIVE: unpack_u16,
+        PropertyIds.AUTHENTICATION_METHOD: unpack_string,
+        PropertyIds.AUTHENTICATION_DATA: unpack_binary,
+        PropertyIds.REQUEST_PROBLEM_INFORMATION: unpack_u8,
+        PropertyIds.WILL_DELAY_INTERVAL: unpack_u32,
+        PropertyIds.REQUEST_RESPONSE_INFORMATION: unpack_u8,
+        PropertyIds.RESPONSE_INFORMATION: unpack_string,
+        PropertyIds.SERVER_REFERENCE: unpack_string,
+        PropertyIds.REASON_STRING: unpack_string,
+        PropertyIds.RECEIVE_MAXIMUM: unpack_u16,
+        PropertyIds.TOPIC_ALIAS_MAXIMUM: unpack_u16,
+        PropertyIds.TOPIC_ALIAS: unpack_u16,
+        PropertyIds.MAXIMUM_QOS: unpack_u8,
+        PropertyIds.RETAIN_AVAILABLE: unpack_u8,
+        PropertyIds.USER_PROPERTY: unpack_string,
+        PropertyIds.MAXIMUM_PACKET_SIZE: unpack_u32,
+        PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE: unpack_u8,
+        PropertyIds.SUBSCRIPTION_IDENTIFIER_AVAILABLE: unpack_u8,
+        PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: unpack_u8
+    }[property_id](payload)
 
 
 def unpack_properties(packet_name,
@@ -288,27 +317,14 @@ def unpack_properties(packet_name,
     properties = {}
 
     while payload.tell() < end_pos:
-        buf = payload.read(1)
-
-        if not buf:
-            LOGGER.info('Not engouh property data in %s.', packet_name)
-            break
-
-        property_id = buf[0]
+        property_id = payload.read(1)[0]
 
         if property_id not in allowed_property_ids:
-            LOGGER.info('Invalid property identifier %d in %s.',
-                        property_id,
-                        packet_name)
-            break
+            raise MalformedPacketError(
+                f'Invalid property identifier {property_id}.')
 
         property_id = PropertyIds(property_id)
-        value = unpack_property(property_id, payload)
-
-        if value is None:
-            return None
-
-        properties[property_id] = value
+        properties[property_id] = unpack_property(property_id, payload)
 
     # Log the properties.
     LOGGER.debug('%s properties:', packet_name)
@@ -433,7 +449,7 @@ def unpack_connack(payload):
     try:
         reason = ConnectReasonCode(reason)
     except ValueError:
-        raise Error(f'Invalid CONNACK reason {reason}')
+        raise MalformedPacketError(f'Invalid CONNACK reason {reason}')
 
     properties = unpack_properties(
         'CONNACK',
@@ -513,10 +529,9 @@ def pack_publish(topic, message, qos, packet_identifier):
 
 
 def unpack_publish(payload, qos):
-    size = unpack_u16(payload)
-    topic = payload.read(size).decode('utf-8')
+    topic = unpack_string(payload)
 
-    if is_data_available(payload):
+    if payload.is_data_available():
         properties = unpack_properties(
             'PUBLISH',
             [
@@ -532,20 +547,19 @@ def unpack_publish(payload, qos):
             payload)
 
     if qos == 0:
-        message = payload.read()
+        message = payload.read_all()
     else:
         payload.read(2)
-        message = payload.read()
+        message = payload.read_all()
 
     return topic, message
 
 
 def unpack_puback(payload):
     packet_identifier = unpack_u16(payload)
-    buf = payload.read(1)
 
-    if buf:
-        reason = buf[0]
+    if payload.is_data_available():
+        reason = payload.read(1)[0]
     else:
         reason = 0
 
@@ -554,7 +568,7 @@ def unpack_puback(payload):
     except ValueError:
         pass
 
-    if is_data_available(payload):
+    if payload.is_data_available():
         unpack_properties('PUBACK',
                           [
                               PropertyIds.REASON_STRING,
@@ -567,10 +581,9 @@ def unpack_puback(payload):
 
 def unpack_pubrec(payload):
     packet_identifier = unpack_u16(payload)
-    buf = payload.read(1)
 
-    if buf:
-        reason = buf[0]
+    if payload.is_data_available():
+        reason = payload.read(1)[0]
     else:
         reason = 0
 
@@ -579,7 +592,7 @@ def unpack_pubrec(payload):
     except ValueError:
         pass
 
-    if is_data_available(payload):
+    if payload.is_data_available():
         unpack_properties('PUBREC',
                           [
                               PropertyIds.REASON_STRING,
@@ -592,10 +605,9 @@ def unpack_pubrec(payload):
 
 def unpack_pubcomp(payload):
     packet_identifier = unpack_u16(payload)
-    buf = payload.read(1)
 
-    if buf:
-        reason = buf[0]
+    if payload.is_data_available():
+        reason = payload.read(1)[0]
     else:
         reason = 0
 
@@ -604,7 +616,7 @@ def unpack_pubcomp(payload):
     except ValueError:
         pass
 
-    if is_data_available(payload):
+    if payload.is_data_available():
         unpack_properties('PUBCOMP',
                           [
                               PropertyIds.REASON_STRING,
@@ -843,10 +855,22 @@ class Client(object):
 
     async def on_publish(self, flags, payload):
         qos = ((flags >> 1) & 0x3)
-        await self.messages.put(unpack_publish(payload, qos))
+
+        try:
+            unpacked = unpack_publish(payload, qos)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed PUBLISH packet.')
+            return
+
+        # ToDo: Add support for QoS 1 and 2.
+        await self.messages.put(unpacked)
 
     def on_puback(self, payload):
-        packet_identifier, reason = unpack_puback(payload)
+        try:
+            packet_identifier, reason = unpack_puback(payload)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed PUBACK packet.')
+            return
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(reason)
@@ -856,7 +880,11 @@ class Client(object):
                 packet_identifier)
 
     def on_pubrec(self, payload):
-        packet_identifier, reason = unpack_pubrec(payload)
+        try:
+            packet_identifier, reason = unpack_pubrec(payload)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed PUBREC packet.')
+            return
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_response(reason)
@@ -866,7 +894,11 @@ class Client(object):
                 packet_identifier)
 
     def on_pubcomp(self, payload):
-        packet_identifier, reason = unpack_pubcomp(payload)
+        try:
+            packet_identifier, reason = unpack_pubcomp(payload)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed PUBCOMP packet.')
+            return
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(reason)
@@ -876,7 +908,11 @@ class Client(object):
                 packet_identifier)
 
     def on_suback(self, payload):
-        packet_identifier, properties = unpack_suback(payload)
+        try:
+            packet_identifier, properties = unpack_suback(payload)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed SUBACK packet.')
+            return
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(None)
@@ -1013,7 +1049,7 @@ class Client(object):
                          control_packet_type_to_string(packet_type),
                          binascii.hexlify(buf + data))
 
-        return packet_type, flags, BytesIO(data)
+        return packet_type, flags, PayloadReader(data)
 
     def alloc_packet_identifier(self):
         packet_identifier = self._next_packet_identifier
