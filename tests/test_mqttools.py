@@ -302,6 +302,40 @@ class MQTToolsTest(unittest.TestCase):
 
         self.assertIn('Published 11 message(s) in', stdout.getvalue())
 
+    def test_command_line_publish_qos_1(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x1d\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x10mqttools_publish'),
+            # CONNACK
+            ('s2c', b'\x20\x09\x00\x00\x06\x21\x00\x0a\x22\x00\x05'),
+            # PUBLISH
+            ('c2s', b'\x32\x0c\x00\x04\x2f\x61\x2f\x62\x00\x01\x00\x66\x6f\x6f'),
+            # PUBACK
+            ('s2c', b'\x40\x02\x00\x01'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        argv = [
+            'mqttools',
+            'publish',
+            '--host', self.broker.address[0],
+            '--port', str(self.broker.address[1]),
+            '--client-id', 'mqttools_publish',
+            '--qos', '1',
+            '/a/b',
+            'foo'
+        ]
+
+        stdout = StringIO()
+
+        with patch('sys.stdout', stdout):
+            with patch('sys.argv', argv):
+                mqttools.main()
+
+        self.assertIn('Published 1 message(s) in', stdout.getvalue())
+        self.assertIn('from 10 concurrent task(s).', stdout.getvalue())
+
 
 logging.basicConfig(level=logging.DEBUG)
 
