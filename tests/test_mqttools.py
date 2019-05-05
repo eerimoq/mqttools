@@ -221,6 +221,87 @@ class MQTToolsTest(unittest.TestCase):
 
         self.assertIn('Published 1 message(s) in', stdout.getvalue())
 
+    def test_command_line_publish_qos_0_generate_message(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x1d\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x10mqttools_publish'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x30\x11\x00\x04/a/b\x000\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        argv = [
+            'mqttools',
+            'publish',
+            '--host', self.broker.address[0],
+            '--port', str(self.broker.address[1]),
+            '--client-id', 'mqttools_publish',
+            '--size', '10',
+            '/a/b'
+        ]
+
+        stdout = StringIO()
+
+        with patch('sys.stdout', stdout):
+            with patch('sys.argv', argv):
+                mqttools.main()
+
+        self.assertIn('Published 1 message(s) in', stdout.getvalue())
+
+    def test_command_line_publish_qos_0_generate_short_message(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x1d\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x10mqttools_publish'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x000'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x001'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x002'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x003'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x004'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x005'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x006'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x007'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x008'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x009'),
+            # PUBLISH
+            ('c2s', b'\x30\x08\x00\x04/a/b\x001'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        argv = [
+            'mqttools',
+            'publish',
+            '--host', self.broker.address[0],
+            '--port', str(self.broker.address[1]),
+            '--client-id', 'mqttools_publish',
+            '--count', '11',
+            '--size', '1',
+            '/a/b'
+        ]
+
+        stdout = StringIO()
+
+        with patch('sys.stdout', stdout):
+            with patch('sys.argv', argv):
+                mqttools.main()
+
+        self.assertIn('Published 11 message(s) in', stdout.getvalue())
+
 
 logging.basicConfig(level=logging.DEBUG)
 
