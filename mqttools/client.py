@@ -475,7 +475,8 @@ class Client(object):
                  will_message=b'',
                  will_qos=0,
                  keep_alive_s=0,
-                 response_timeout=5):
+                 response_timeout=5,
+                 **kwargs):
         self._host = host
         self._port = port
 
@@ -487,6 +488,7 @@ class Client(object):
         self._will_message = will_message
         self._will_qos = will_qos
         self._keep_alive_s = keep_alive_s
+        self._kwargs = kwargs
         self.response_timeout = response_timeout
         self._reader = None
         self._writer = None
@@ -509,7 +511,8 @@ class Client(object):
     async def start(self):
         self._reader, self._writer = await asyncio.open_connection(
             self._host,
-            self._port)
+            self._port,
+            **self._kwargs)
         self._monitor_task = asyncio.create_task(self.monitor_main())
         self._reader_task = asyncio.create_task(self.reader_main())
 
@@ -674,7 +677,8 @@ class Client(object):
 
         self._reader, self._writer = await asyncio.open_connection(
             self._host,
-            self._port)
+            self._port,
+            **self._kwargs)
         await self.connect()
 
         for topic, qos in self._subscribed:
