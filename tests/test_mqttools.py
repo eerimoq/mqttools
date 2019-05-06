@@ -382,6 +382,33 @@ class MQTToolsTest(unittest.TestCase):
                                                0))
         self.run_until_complete(client.stop())
 
+    def test_use_all_topic_aliases(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            (
+                'c2s',
+                b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'
+            ),
+            # CONNACK with topic alias 5
+            ('s2c', b'\x20\x06\x00\x00\x03\x22\x00\x01'),
+            # PUBLISH to set alias
+            ('c2s', b'\x30\x0d\x00\x04/foo\x03\x23\x00\x01apa'),
+            # PUBLISH, no alias available
+            ('c2s', b'\x30\x0a\x00\x04/bar\x00cat'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 topic_aliases=[
+                                     '/foo'
+                                 ])
+        self.run_until_complete(client.start())
+        self.run_until_complete(client.publish('/foo', b'apa', 0))
+        self.run_until_complete(client.publish('/bar', b'cat', 0))
+        self.run_until_complete(client.stop())
+
 
 logging.basicConfig(level=logging.DEBUG)
 
