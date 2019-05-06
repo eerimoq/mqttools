@@ -336,6 +336,52 @@ class MQTToolsTest(unittest.TestCase):
         self.assertIn('Published 1 message(s) in', stdout.getvalue())
         self.assertIn('from 10 concurrent task(s).', stdout.getvalue())
 
+    def test_topic_alias(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            (
+                'c2s',
+                b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'
+            ),
+            # CONNACK with topic alias 5
+            ('s2c', b'\x20\x06\x00\x00\x03\x22\x00\x05'),
+            # PUBLISH to set alias
+            (
+                'c2s',
+                b'\x30\x2c\x00\x12/test/mqttools/foo\x03\x23\x00\x01'
+                b'sets-alias-in-broker'
+            ),
+            # PUBLISH using alias
+            (
+                'c2s',
+                b'\x30\x1a\x00\x00\x03\x23\x00\x01published-with-alias'
+            ),
+            # PUBLISH without alias
+            (
+                'c2s',
+                b'\x30\x24\x00\x12/test/mqttools/fie\x00not-using-alias'
+            ),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 topic_aliases=[
+                                     '/test/mqttools/foo'
+                                 ])
+        self.run_until_complete(client.start())
+        self.run_until_complete(client.publish('/test/mqttools/foo',
+                                               b'sets-alias-in-broker',
+                                               0))
+        self.run_until_complete(client.publish('/test/mqttools/foo',
+                                               b'published-with-alias',
+                                               0))
+        self.run_until_complete(client.publish('/test/mqttools/fie',
+                                               b'not-using-alias',
+                                               0))
+        self.run_until_complete(client.stop())
+
 
 logging.basicConfig(level=logging.DEBUG)
 
