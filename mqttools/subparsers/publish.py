@@ -3,7 +3,6 @@ import time
 from humanfriendly import format_timespan
 
 from ..client import Client
-from . import try_decode
 
 
 class Counter(object):

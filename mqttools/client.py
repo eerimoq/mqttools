@@ -273,6 +273,47 @@ def unpack_u8(payload):
     return payload.read(1)[0]
 
 
+def pack_property(property_id, value):
+    return struct.pack('B', property_id) + {
+        PropertyIds.PAYLOAD_FORMAT_INDICATOR: pack_u8,
+        PropertyIds.MESSAGE_EXPIRY_INTERVAL: pack_u32,
+        PropertyIds.CONTENT_TYPE: pack_string,
+        PropertyIds.RESPONSE_TOPIC: pack_string,
+        PropertyIds.CORRELATION_DATA: pack_binary,
+        PropertyIds.SUBSCRIPTION_IDENTIFIER: pack_variable_integer,
+        PropertyIds.SESSION_EXPIRY_INTERVAL: pack_u32,
+        PropertyIds.ASSIGNED_CLIENT_IDENTIFIER: pack_string,
+        PropertyIds.SERVER_KEEP_ALIVE: pack_u16,
+        PropertyIds.AUTHENTICATION_METHOD: pack_string,
+        PropertyIds.AUTHENTICATION_DATA: pack_binary,
+        PropertyIds.REQUEST_PROBLEM_INFORMATION: pack_u8,
+        PropertyIds.WILL_DELAY_INTERVAL: pack_u32,
+        PropertyIds.REQUEST_RESPONSE_INFORMATION: pack_u8,
+        PropertyIds.RESPONSE_INFORMATION: pack_string,
+        PropertyIds.SERVER_REFERENCE: pack_string,
+        PropertyIds.REASON_STRING: pack_string,
+        PropertyIds.RECEIVE_MAXIMUM: pack_u16,
+        PropertyIds.TOPIC_ALIAS_MAXIMUM: pack_u16,
+        PropertyIds.TOPIC_ALIAS: pack_u16,
+        PropertyIds.MAXIMUM_QOS: pack_u8,
+        PropertyIds.RETAIN_AVAILABLE: pack_u8,
+        PropertyIds.USER_PROPERTY: pack_string,
+        PropertyIds.MAXIMUM_PACKET_SIZE: pack_u32,
+        PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE: pack_u8,
+        PropertyIds.SUBSCRIPTION_IDENTIFIER_AVAILABLE: pack_u8,
+        PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: pack_u8
+    }[property_id](value)
+
+
+def pack_properties(properties):
+    packed = b''
+
+    for property_id, value in properties.items():
+        packed += pack_property(property_id, value)
+
+    return pack_variable_integer(len(packed)) + packed
+
+
 def unpack_property(property_id, payload):
     return {
         PropertyIds.PAYLOAD_FORMAT_INDICATOR: unpack_u8,
@@ -509,9 +550,14 @@ def unpack_suback(payload):
     return packet_identifier, properties
 
 
-def pack_publish(topic, message, qos, packet_identifier):
+def pack_publish(topic, message, qos, packet_identifier, alias):
+    if alias is None:
+        properties = b'\x00'
+    else:
+        properties = pack_properties({PropertyIds.TOPIC_ALIAS: alias})
+
     packed_topic = pack_string(topic)
-    size = len(packed_topic) + len(message) + 1
+    size = len(packed_topic) + len(message) + len(properties)
 
     if qos > 0:
         size += 2
@@ -520,9 +566,9 @@ def pack_publish(topic, message, qos, packet_identifier):
     packed += packed_topic
 
     if qos > 0:
-        packed += struct.pack('>H', packet_identifier)
+        packed += pack_u16(packet_identifier)
 
-    packed += pack_variable_integer(0)
+    packed += properties
     packed += message
 
     return packed
@@ -698,6 +744,7 @@ class Client(object):
                  will_qos=0,
                  keep_alive_s=0,
                  response_timeout=50,
+                 topic_aliases=None,
                  **kwargs):
         self._host = host
         self._port = port
@@ -712,6 +759,14 @@ class Client(object):
         self._keep_alive_s = keep_alive_s
         self._kwargs = kwargs
         self.response_timeout = response_timeout
+
+        if topic_aliases is None:
+            topic_aliases = []
+
+        self._topic_aliases = {
+            topic: alias
+            for alias, topic in enumerate(topic_aliases, 1)
+        }
         self._reader = None
         self._writer = None
         self._monitor_task = None
@@ -726,6 +781,8 @@ class Client(object):
         self._next_packet_identifier = 1
         self._receive_maximum = None
         self._receive_maximum_semaphore = None
+        self._topic_alias_maximum = None
+        self._registered_topic_aliases = set()
 
         if keep_alive_s == 0:
             self._ping_period_s = None
@@ -795,6 +852,10 @@ class Client(object):
 
         _, reason, properties = self._connack
 
+        if reason != ConnectReasonCode.SUCCESS:
+            raise ConnectError(self._connect_reason)
+
+        # Receive maximum.
         if PropertyIds.RECEIVE_MAXIMUM in properties:
             self._receive_maximum = properties[PropertyIds.RECEIVE_MAXIMUM]
         else:
@@ -802,8 +863,22 @@ class Client(object):
 
         self._receive_maximum_semaphore = asyncio.Semaphore(self._receive_maximum)
 
-        if reason != ConnectReasonCode.SUCCESS:
-            raise ConnectError(self._connect_reason)
+        # Topic alias maximum.
+        if PropertyIds.TOPIC_ALIAS_MAXIMUM in properties:
+            self._topic_alias_maximum = properties[PropertyIds.TOPIC_ALIAS_MAXIMUM]
+        else:
+            self._topic_alias_maximum = 0
+
+        if len(self._topic_aliases) > self._topic_alias_maximum:
+            LOGGER.warning('The broker topic alias maximum is %d, which is lower '
+                           'than the topic aliases length %d.',
+                           self._topic_alias_maximum,
+                           len(self._topic_aliases))
+            self._topic_aliases = {
+                topic: alias
+                for topic, alias in self._topic_aliases
+                if alias < self._topic_alias_maximum
+            }
 
     def disconnect(self):
         self._write_packet(pack_disconnect())
@@ -816,32 +891,35 @@ class Client(object):
             await transaction.wait_until_completed()
             self._subscribed.add((topic, qos))
 
-    def publish_qos_0(self, topic, message):
+    def publish_qos_0(self, topic, alias, message):
         with Transaction(self) as transaction:
             self._write_packet(pack_publish(topic,
                                             message,
                                             0,
-                                            transaction.packet_identifier))
+                                            transaction.packet_identifier,
+                                            alias))
 
-    async def publish_qos_1(self, topic, message):
+    async def publish_qos_1(self, topic, alias, message):
         async with self._receive_maximum_semaphore:
             with Transaction(self) as transaction:
                 self._write_packet(pack_publish(topic,
                                                 message,
                                                 1,
-                                                transaction.packet_identifier))
+                                                transaction.packet_identifier,
+                                                alias))
                 reason = await transaction.wait_until_completed()
 
                 if reason != PubackReasonCode.SUCCESS:
                     raise PublishError(reason)
 
-    async def publish_qos_2(self, topic, message):
+    async def publish_qos_2(self, topic, alias, message):
         async with self._receive_maximum_semaphore:
             with Transaction(self) as transaction:
                 self._write_packet(pack_publish(topic,
                                                 message,
                                                 2,
-                                                transaction.packet_identifier))
+                                                transaction.packet_identifier,
+                                                alias))
                 reason = await transaction.wait_for_response()
 
                 if reason != PubrecReasonCode.SUCCESS:
@@ -855,14 +933,25 @@ class Client(object):
                     raise PublishError(reason)
 
     async def publish(self, topic, message, qos):
+        if topic in self._topic_aliases:
+            alias = self._topic_aliases[topic]
+
+            if alias in self._registered_topic_aliases:
+                topic = ''
+        else:
+            alias = None
+
         if qos == 0:
-            self.publish_qos_0(topic, message)
+            self.publish_qos_0(topic, alias, message)
         elif qos == 1:
-            await self.publish_qos_1(topic, message)
+            await self.publish_qos_1(topic, alias, message)
         elif qos == 2:
-            await self.publish_qos_2(topic, message)
+            await self.publish_qos_2(topic, alias, message)
         else:
             raise Error(f'Invalid QoS {qos}.')
+
+        if (alias is not None) and (topic != ''):
+            self._registered_topic_aliases.add(alias)
 
     def on_connack(self, payload):
         self._connack = unpack_connack(payload)
@@ -941,6 +1030,8 @@ class Client(object):
 
     async def reconnect(self):
         LOGGER.warning('Reconnecting...')
+
+        self._registered_topic_aliases = set()
 
         self._reader, self._writer = await asyncio.open_connection(
             self._host,
