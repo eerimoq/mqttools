@@ -339,10 +339,7 @@ class MQTToolsTest(unittest.TestCase):
     def test_topic_alias(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
-            (
-                'c2s',
-                b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'
-            ),
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
             # CONNACK with topic alias 5
             ('s2c', b'\x20\x06\x00\x00\x03\x22\x00\x05'),
             # PUBLISH to set alias
@@ -352,15 +349,9 @@ class MQTToolsTest(unittest.TestCase):
                 b'sets-alias-in-broker'
             ),
             # PUBLISH using alias
-            (
-                'c2s',
-                b'\x30\x1a\x00\x00\x03\x23\x00\x01published-with-alias'
-            ),
+            ('c2s', b'\x30\x1a\x00\x00\x03\x23\x00\x01published-with-alias'),
             # PUBLISH without alias
-            (
-                'c2s',
-                b'\x30\x24\x00\x12/test/mqttools/fie\x00not-using-alias'
-            ),
+            ('c2s', b'\x30\x24\x00\x12/test/mqttools/fie\x00not-using-alias'),
             # DISCONNECT
             ('c2s', b'\xe0\x02\x00\x00')
         ]
@@ -385,10 +376,7 @@ class MQTToolsTest(unittest.TestCase):
     def test_use_all_topic_aliases(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
-            (
-                'c2s',
-                b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'
-            ),
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
             # CONNACK with topic alias 5
             ('s2c', b'\x20\x06\x00\x00\x03\x22\x00\x01'),
             # PUBLISH to set alias
@@ -408,6 +396,21 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.publish('/foo', b'apa', 0))
         self.run_until_complete(client.publish('/bar', b'cat', 0))
         self.run_until_complete(client.stop())
+
+    def test_connack_unspecified_error(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK with unspecified error
+            ('s2c', b'\x20\x03\x00\x80\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address, 'bar')
+
+        with self.assertRaises(mqttools.ConnectError) as cm:
+            self.run_until_complete(client.start())
+
+        self.assertEqual(str(cm.exception), 'UNSPECIFIED_ERROR(128)')
 
 
 logging.basicConfig(level=logging.DEBUG)

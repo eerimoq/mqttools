@@ -207,7 +207,7 @@ class PayloadReader(BytesIO):
         data = super().read(size)
 
         if len(data) != size:
-            raise MalformedPacketError()
+            raise MalformedPacketError('Payload too short.')
 
         return data
 
@@ -853,7 +853,7 @@ class Client(object):
         _, reason, properties = self._connack
 
         if reason != ConnectReasonCode.SUCCESS:
-            raise ConnectError(self._connect_reason)
+            raise ConnectError(reason)
 
         # Receive maximum.
         if PropertyIds.RECEIVE_MAXIMUM in properties:
