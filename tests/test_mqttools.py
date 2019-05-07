@@ -251,6 +251,79 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.publish('/a/b', b'apa', 2))
         self.run_until_complete(client.stop())
 
+    def test_publish_qos_1_packet_identifier_in_use(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x32\x0c\x00\x04/a/b\x00\x01\x00apa'),
+            # PUBACK
+            ('s2c', b'\x40\x03\x00\x01\x91'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address, 'bar')
+        self.run_until_complete(client.start())
+
+        with self.assertRaises(mqttools.PublishError) as cm:
+            self.run_until_complete(client.publish('/a/b', b'apa', 1))
+
+        self.assertEqual(str(cm.exception), 'PACKET_IDENTIFIER_IN_USE(145)')
+        self.run_until_complete(client.stop())
+
+    def test_publish_qos_2_packet_identifier_not_found_pubrec(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x34\x0c\x00\x04/a/b\x00\x01\x00apa'),
+            # PUBREC
+            ('s2c', b'\x50\x03\x00\x01\x91'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address, 'bar')
+        self.run_until_complete(client.start())
+
+        with self.assertRaises(mqttools.PublishError) as cm:
+            self.run_until_complete(client.publish('/a/b', b'apa', 2))
+
+        self.assertEqual(str(cm.exception), 'PACKET_IDENTIFIER_IN_USE(145)')
+        self.run_until_complete(client.stop())
+
+    def test_publish_qos_2_packet_identifier_not_found_pubcomp(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # PUBLISH
+            ('c2s', b'\x34\x0c\x00\x04/a/b\x00\x01\x00apa'),
+            # PUBREC
+            ('s2c', b'\x50\x03\x00\x01\x10'),
+            # PUBREL
+            ('c2s', b'\x62\x02\x00\x01'),
+            # PUBCOMP
+            ('s2c', b'\x70\x03\x00\x01\x92'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address, 'bar')
+        self.run_until_complete(client.start())
+
+        with self.assertRaises(mqttools.PublishError) as cm:
+            self.run_until_complete(client.publish('/a/b', b'apa', 2))
+
+        self.assertEqual(str(cm.exception), 'PACKET_IDENTIFIER_NOT_FOUND(146)')
+        self.run_until_complete(client.stop())
+
     def test_command_line_publish_qos_0(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT

@@ -172,11 +172,11 @@ class Error(Exception):
     pass
 
 
-class MalformedPacketError(Exception):
+class MalformedPacketError(Error):
     pass
 
 
-class ConnectError(Exception):
+class ConnectError(Error):
 
     def __init__(self, reason):
         super().__init__()
@@ -191,14 +191,18 @@ class ConnectError(Exception):
         return message
 
 
-class PublishError(Exception):
+class PublishError(Error):
 
     def __init__(self, reason):
         super().__init__()
         self.reason = reason
 
     def __str__(self):
-        return f'{self.reason.name}({self.reason.value})'
+        if isinstance(self.reason, enum.Enum):
+            return f'{self.reason.name}({self.reason.value})'
+        else:
+            return f'UNKNOWN({self.reason})'
+
 
 
 class PayloadReader(BytesIO):
