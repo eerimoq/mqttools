@@ -1,6 +1,7 @@
 import asyncio
 import mqttools
 
+
 async def publisher():
     client = mqttools.Client('broker.hivemq.com', 1883)
 
@@ -8,5 +9,6 @@ async def publisher():
     await client.publish('/test/mqttools/foo', b'bar', 0)
     await client.stop()
     print("Successfully published b'bar' on /test/mqttools/foo.")
+
 
 asyncio.run(publisher())

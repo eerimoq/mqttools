@@ -765,7 +765,7 @@ def unpack_pubcomp(payload):
     return packet_identifier, reason
 
 
-def pack_ping():
+def pack_pingreq():
     return pack_fixed_header(ControlPacketType.PINGREQ, 0, 0)
 
 
@@ -809,7 +809,7 @@ class Transaction(object):
 
 
 class Client(object):
-    """An MQTT client that reconnects on communication failure.
+    """An MQTT client.
 
     """
 
@@ -821,7 +821,7 @@ class Client(object):
                  will_message=b'',
                  will_qos=0,
                  keep_alive_s=0,
-                 response_timeout=60,
+                 response_timeout=5,
                  topic_aliases=None,
                  **kwargs):
         self._host = host
@@ -841,32 +841,31 @@ class Client(object):
         if topic_aliases is None:
             topic_aliases = []
 
-        self._topic_aliases = {
+        self._topic_aliases = None
+        self._topic_aliases_init = {
             topic: alias
             for alias, topic in enumerate(topic_aliases, 1)
         }
         self._reader = None
         self._writer = None
-        self._monitor_task = None
         self._reader_task = None
         self._keep_alive_task = None
-        self._connack_event = asyncio.Event()
-        self._pingresp_event = asyncio.Event()
-        self.transactions = {}
-        self._subscribed = set()
-        self.messages = asyncio.Queue()
+        self._connack_event = None
+        self._pingresp_event = None
+        self.transactions = None
+        self.messages = None
         self._connack = None
-        self._next_packet_identifier = 1
+        self._next_packet_identifier = None
         self._receive_maximum = None
         self._receive_maximum_semaphore = None
         self._topic_alias_maximum = None
-        self._registered_topic_aliases = set()
-        self._on_publish_qos_2_transactions = {}
+        self._registered_topic_aliases = None
+        self._on_publish_qos_2_transactions = None
 
         if keep_alive_s == 0:
             self._ping_period_s = None
         else:
-            self._ping_period_s = max(0.1, keep_alive_s - response_timeout - 1)
+            self._ping_period_s = max(1, keep_alive_s - response_timeout - 1)
 
     @property
     def client_id(self):
@@ -877,32 +876,50 @@ class Client(object):
         return self._receive_maximum
 
     async def start(self):
+        """Start the connection to the broker.
+
+        """
+
+        self._topic_aliases = {}
+        self._connack_event = asyncio.Event()
+        self._pingresp_event = asyncio.Event()
+        self.transactions = {}
+        self.messages = asyncio.Queue()
+        self._connack = None
+        self._next_packet_identifier = 1
+        self._receive_maximum = None
+        self._receive_maximum_semaphore = None
+        self._topic_alias_maximum = None
+        self._registered_topic_aliases = set()
+        self._on_publish_qos_2_transactions = {}
         self._reader, self._writer = await asyncio.open_connection(
             self._host,
             self._port,
             **self._kwargs)
-        self._monitor_task = asyncio.create_task(self.monitor_main())
         self._reader_task = asyncio.create_task(self.reader_main())
 
         if self._keep_alive_s != 0:
             self._keep_alive_task = asyncio.create_task(self.keep_alive_main())
+        else:
+            self._keep_alive_task = None
 
         await self.connect()
 
     async def stop(self):
-        self.disconnect()
-        self._monitor_task.cancel()
+        """Stop the connection to the broker.
+
+        """
 
         try:
-            await self._monitor_task
-        except asyncio.CancelledError:
+            self.disconnect()
+        except Exception:
             pass
 
         self._reader_task.cancel()
 
         try:
             await self._reader_task
-        except asyncio.CancelledError:
+        except Exception:
             pass
 
         if self._keep_alive_task is not None:
@@ -910,7 +927,7 @@ class Client(object):
 
             try:
                 await self._keep_alive_task
-            except asyncio.CancelledError:
+            except Exception:
                 pass
 
         self._writer.close()
@@ -948,16 +965,17 @@ class Client(object):
         else:
             self._topic_alias_maximum = 0
 
-        if len(self._topic_aliases) > self._topic_alias_maximum:
+        if len(self._topic_aliases_init) > self._topic_alias_maximum:
             LOGGER.warning('The broker topic alias maximum is %d, which is lower '
                            'than the topic aliases length %d.',
                            self._topic_alias_maximum,
-                           len(self._topic_aliases))
-            self._topic_aliases = {
-                topic: alias
-                for topic, alias in self._topic_aliases
-                if alias < self._topic_alias_maximum
-            }
+                           len(self._topic_aliases_init))
+
+        self._topic_aliases = {
+            topic: alias
+            for topic, alias in self._topic_aliases_init.items()
+            if alias < self._topic_alias_maximum + 1
+        }
 
     def disconnect(self):
         self._write_packet(pack_disconnect())
@@ -968,7 +986,6 @@ class Client(object):
                                               qos,
                                               transaction.packet_identifier))
             await transaction.wait_until_completed()
-            self._subscribed.add((topic, qos))
 
     def publish_qos_0(self, topic, alias, message):
         with Transaction(self) as transaction:
@@ -1164,47 +1181,9 @@ class Client(object):
     def on_pingresp(self):
         self._pingresp_event.set()
 
-    async def reconnect(self):
-        LOGGER.warning('Reconnecting...')
-
-        self._registered_topic_aliases = set()
-
-        self._reader, self._writer = await asyncio.open_connection(
-            self._host,
-            self._port,
-            **self._kwargs)
-        await self.connect()
-
-        for topic, qos in self._subscribed:
-            await self.subscribe(topic, qos)
-
-    async def monitor_loop(self):
-        while True:
-            if self._writer.is_closing():
-                self._writer.close()
-                await self.reconnect()
-
-            await asyncio.sleep(1)
-
-    async def monitor_main(self):
-        """Monitor the broker connection and reconnect on failure.
-
-        """
-
-        try:
-            await self.monitor_loop()
-        except BaseException as e:
-            LOGGER.info('Monitor task stopped by %r.', e)
-            raise
-
     async def reader_loop(self):
         while True:
-            try:
-                packet_type, flags, payload = await self._read_packet()
-            except asyncio.IncompleteReadError:
-                LOGGER.info('Failed to read packet.')
-                await asyncio.sleep(1)
-                continue
+            packet_type, flags, payload = await self._read_packet()
 
             if packet_type == ControlPacketType.CONNACK:
                 self.on_connack(payload)
@@ -1234,9 +1213,10 @@ class Client(object):
 
         try:
             await self.reader_loop()
-        except BaseException as e:
+        except Exception as e:
             LOGGER.info('Reader task stopped by %r.', e)
-            raise
+            self._writer.close()
+            await self.messages.put((None, None))
 
     async def keep_alive_loop(self):
         while True:
@@ -1245,14 +1225,9 @@ class Client(object):
             LOGGER.debug('Pinging the broker.')
 
             self._pingresp_event.clear()
-            self._write_packet(pack_ping())
-
-            try:
-                await asyncio.wait_for(self._pingresp_event.wait(),
-                                       self.response_timeout)
-            except asyncio.TimeoutError:
-                LOGGER.warning('Timeout waiting for ping response.')
-                self._writer.close()
+            self._write_packet(pack_pingreq())
+            await asyncio.wait_for(self._pingresp_event.wait(),
+                                   self.response_timeout)
 
     async def keep_alive_main(self):
         """Ping the broker periodically to keep the connection alive.
@@ -1261,9 +1236,10 @@ class Client(object):
 
         try:
             await self.keep_alive_loop()
-        except BaseException as e:
+        except Exception as e:
             LOGGER.info('Keep alive task stopped by %r.', e)
-            raise
+            self._writer.close()
+            await self.messages.put((None, None))
 
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):

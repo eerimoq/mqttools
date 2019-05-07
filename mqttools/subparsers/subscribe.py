@@ -13,6 +13,10 @@ async def subscriber(host, port, client_id, topic, qos, keep_alive_s):
     while True:
         topic, message = await client.messages.get()
 
+        if topic is None:
+            print('Broker connection lost!')
+            break
+
         print(f'Topic:   {topic}')
         print(f'Message: {try_decode(message)}')
 

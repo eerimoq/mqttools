@@ -1,3 +1,4 @@
+import sys
 import threading
 import textwrap
 import asyncio
@@ -23,10 +24,14 @@ class ClientThread(threading.Thread):
         self._host = args.host
         self._port = args.port
         self._client_id = args.client_id
+        self._keep_alive_s = args.keep_alive
         self._topics = args.subscribe
 
     async def main(self):
-        client = Client(self._host, self._port, self._client_id)
+        client = Client(self._host,
+                        self._port,
+                        self._client_id,
+                        keep_alive_s=self._keep_alive_s)
 
         await client.start()
         await asyncio.gather(*[client.subscribe(topic, 0)
@@ -142,6 +147,10 @@ class Monitor(object):
 
     def try_update_message(self):
         timestamp, topic, message = self._queue.get_nowait()
+
+        if topic is None:
+            sys.exit('Broker connection lost!')
+
         lines = []
         row_length = max(1, self._ncols - 12)
 
@@ -217,6 +226,11 @@ def add_subparser(subparsers):
                            help='Broker port (default: 1883).')
     subparser.add_argument('--client-id',
                            help='Client id (default: mqttools-<UUID[0..14]>).')
+    subparser.add_argument('--keep-alive',
+                           type=int,
+                           default=0,
+                           help=('Keep alive time in seconds (default: 0). Give '
+                                 'as 0 to disable keep alive.'))
     subparser.add_argument(
         'subscribe',
         nargs='*',

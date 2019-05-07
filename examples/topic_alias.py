@@ -17,4 +17,5 @@ async def publisher():
     await client.stop()
     print("Successfully published b'bar' on /test/mqttools/foo.")
 
+
 asyncio.run(publisher())

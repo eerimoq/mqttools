@@ -1,6 +1,7 @@
 import asyncio
 import mqttools
 
+
 async def will():
     client = mqttools.Client('broker.hivemq.com',
                              1883,
@@ -11,5 +12,6 @@ async def will():
     await client.start()
     await client.stop()
     print("Successfully connected with will.")
+
 
 asyncio.run(will())

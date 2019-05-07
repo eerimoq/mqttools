@@ -18,6 +18,8 @@ class Client(threading.Thread):
         super().__init__()
         self._host = host
         self._port = port
+        self.messages = []
+        self.done = threading.Event()
 
     async def client(self):
         client = mqttools.Client(self._host,
@@ -26,14 +28,14 @@ class Client(threading.Thread):
                                  response_timeout=1,
                                  keep_alive_s=1)
 
-        await client.start()
-        await client.subscribe('/a/b', 0)
-
-        while True:
-            await client.messages.get()
+        for _ in range(3):
+            await client.start()
+            self.messages.append(await client.messages.get())
+            await client.stop()
 
     def run(self):
         asyncio.run(self.client())
+        self.done.set()
 
 
 class ReconnectTest(unittest.TestCase):
@@ -55,20 +57,15 @@ class ReconnectTest(unittest.TestCase):
             b'\x10\x10\x00\x04MQTT\x05\x02\x00\x01\x00\x00\x03goo')
         # CONNACK
         self.assertEqual(client.send(b'\x20\x03\x00\x00\x00'), 5)
-        # SUBSCRIBE
-        self.assertEqual(
-            client.recv(12),
-            b'\x82\n\x00\x01\x00\x00\x04/a/b\x00')
-        # SUBACK
-        self.assertEqual(client.send(b'\x90\x04\x00\x01\x00\x00'), 6)
         # PINGREQ
         self.assertEqual(client.recv(2), b'\xc0\x00')
         # PINGRESP
         self.assertEqual(client.send(b'\xd0\x00'), 2)
 
-        # Connection closed by the broker. Wait for the client to
-        # reconnect.
+        # Connection closed by the broker.
         client.close()
+
+        # Wait for another connection.
         client, _ = listener.accept()
 
         # CONNECT
@@ -77,17 +74,11 @@ class ReconnectTest(unittest.TestCase):
             b'\x10\x10\x00\x04MQTT\x05\x02\x00\x01\x00\x00\x03goo')
         # CONNACK
         self.assertEqual(client.send(b'\x20\x03\x00\x00\x00'), 5)
-        # SUBSCRIBE
-        self.assertEqual(
-            client.recv(12),
-            b'\x82\n\x00\x02\x00\x00\x04/a/b\x00')
-        # SUBACK
-        self.assertEqual(client.send(b'\x90\x04\x00\x02\x00\x00'), 6)
         # PINGREQ
         self.assertIn(client.recv(2), [b'', b'\xc0\x00'])
 
-        # Don't respond to the ping request. The client should
-        # reconnect.
+        # Don't respond to the ping request and wait for another
+        # connection.
         client2, _ = listener.accept()
         client.close()
 
@@ -97,15 +88,11 @@ class ReconnectTest(unittest.TestCase):
             b'\x10\x10\x00\x04MQTT\x05\x02\x00\x01\x00\x00\x03goo')
         # CONNACK
         self.assertEqual(client2.send(b'\x20\x03\x00\x00\x00'), 5)
-        # SUBSCRIBE
-        self.assertEqual(
-            client2.recv(12),
-            b'\x82\n\x00\x03\x00\x00\x04/a/b\x00')
-        # SUBACK
-        self.assertEqual(client2.send(b'\x90\x04\x00\x03\x00\x00'), 6)
 
         client2.close()
         listener.close()
+        client_thread.done.wait()
+        self.assertEqual(client_thread.messages, 3 * [(None, None)])
 
 
 logging.basicConfig(level=logging.DEBUG)

@@ -15,7 +15,12 @@ async def main():
     print('Subscribed to topic /mqttools/incrementer/value/request.')
 
     while True:
-        _, message = await client.messages.get()
+        topic, message = await client.messages.get()
+
+        if topic is None:
+            print('Broker connection lost!')
+            break
+
         count = int(message)
         print(f'Request count:  {count}')
         count += 1
