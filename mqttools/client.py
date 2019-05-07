@@ -577,28 +577,44 @@ def pack_publish(topic, message, qos, packet_identifier, alias):
 def unpack_publish(payload, qos):
     topic = unpack_string(payload)
 
-    if payload.is_data_available():
-        properties = unpack_properties(
-            'PUBLISH',
-            [
-                PropertyIds.PAYLOAD_FORMAT_INDICATOR,
-                PropertyIds.MESSAGE_EXPIRY_INTERVAL,
-                PropertyIds.CONTENT_TYPE,
-                PropertyIds.RESPONSE_TOPIC,
-                PropertyIds.CORRELATION_DATA,
-                PropertyIds.SUBSCRIPTION_IDENTIFIER,
-                PropertyIds.TOPIC_ALIAS,
-                PropertyIds.USER_PROPERTY
-            ],
-            payload)
-
     if qos == 0:
-        message = payload.read_all()
+        packet_identifier = None
     else:
-        payload.read(2)
-        message = payload.read_all()
+        packet_identifier = unpack_u16(payload)
 
-    return topic, message
+    properties = unpack_properties(
+        'PUBLISH',
+        [
+            PropertyIds.PAYLOAD_FORMAT_INDICATOR,
+            PropertyIds.MESSAGE_EXPIRY_INTERVAL,
+            PropertyIds.CONTENT_TYPE,
+            PropertyIds.RESPONSE_TOPIC,
+            PropertyIds.CORRELATION_DATA,
+            PropertyIds.SUBSCRIPTION_IDENTIFIER,
+            PropertyIds.TOPIC_ALIAS,
+            PropertyIds.USER_PROPERTY
+        ],
+        payload)
+
+    message = payload.read_all()
+
+    return packet_identifier, topic, message
+
+
+def pack_puback(packet_identifier, reason):
+    size = 2
+
+    if reason != PubrecReasonCode.SUCCESS:
+        size += 1
+        reason = pack_u8(reason)
+    else:
+        reason = b''
+
+    packed = pack_fixed_header(ControlPacketType.PUBACK, 0, size)
+    packed += pack_u16(packet_identifier)
+    packed += reason
+
+    return packed
 
 
 def unpack_puback(payload):
@@ -625,6 +641,22 @@ def unpack_puback(payload):
     return packet_identifier, reason
 
 
+def pack_pubrec(packet_identifier, reason):
+    size = 2
+
+    if reason != PubrecReasonCode.SUCCESS:
+        size += 1
+        reason = pack_u8(reason)
+    else:
+        reason = b''
+
+    packed = pack_fixed_header(ControlPacketType.PUBREC, 0, size)
+    packed += pack_u16(packet_identifier)
+    packed += reason
+
+    return packed
+
+
 def unpack_pubrec(payload):
     packet_identifier = unpack_u16(payload)
 
@@ -649,6 +681,62 @@ def unpack_pubrec(payload):
     return packet_identifier, reason
 
 
+def pack_pubrel(packet_identifier, reason):
+    size = 2
+
+    if reason != PubrelReasonCode.SUCCESS:
+        size += 1
+        reason = pack_u8(reason)
+    else:
+        reason = b''
+
+    packed = pack_fixed_header(ControlPacketType.PUBREL, 2, size)
+    packed += pack_u16(packet_identifier)
+    packed += reason
+
+    return packed
+
+
+def unpack_pubrel(payload):
+    packet_identifier = unpack_u16(payload)
+
+    if payload.is_data_available():
+        reason = payload.read(1)[0]
+    else:
+        reason = 0
+
+    try:
+        reason = PubrelReasonCode(reason)
+    except ValueError:
+        pass
+
+    if payload.is_data_available():
+        unpack_properties('PUBREL',
+                          [
+                              PropertyIds.REASON_STRING,
+                              PropertyIds.USER_PROPERTY
+                          ],
+                          payload)
+
+    return packet_identifier, reason
+
+
+def pack_pubcomp(packet_identifier, reason):
+    size = 2
+
+    if reason != PubcompReasonCode.SUCCESS:
+        size += 1
+        reason = pack_u8(reason)
+    else:
+        reason = b''
+
+    packed = pack_fixed_header(ControlPacketType.PUBCOMP, 0, size)
+    packed += pack_u16(packet_identifier)
+    packed += reason
+
+    return packed
+
+
 def unpack_pubcomp(payload):
     packet_identifier = unpack_u16(payload)
 
@@ -671,20 +759,6 @@ def unpack_pubcomp(payload):
                           payload)
 
     return packet_identifier, reason
-
-
-def pack_pubrec(payload):
-    packed = pack_fixed_header(ControlPacketType.PUBREC, 0, 2)
-    packed += payload
-
-    return packed
-
-
-def pack_pubrel(packet_identifier, reason):
-    packed = pack_fixed_header(ControlPacketType.PUBREL, 2, 3)
-    packed += struct.pack('>HB', packet_identifier, reason)
-
-    return packed
 
 
 def pack_ping():
@@ -783,6 +857,7 @@ class Client(object):
         self._receive_maximum_semaphore = None
         self._topic_alias_maximum = None
         self._registered_topic_aliases = set()
+        self._on_publish_qos_2_transactions = {}
 
         if keep_alive_s == 0:
             self._ping_period_s = None
@@ -910,7 +985,11 @@ class Client(object):
                 reason = await transaction.wait_until_completed()
 
                 if reason != PubackReasonCode.SUCCESS:
-                    raise PublishError(reason)
+                    if reason == PubackReasonCode.NO_MATCHING_SUBSCRIBERS:
+                        LOGGER.debug(
+                            'No matching subscribers to topic %s.', topic)
+                    else:
+                        raise PublishError(reason)
 
     async def publish_qos_2(self, topic, alias, message):
         async with self._receive_maximum_semaphore:
@@ -922,8 +1001,12 @@ class Client(object):
                                                 alias))
                 reason = await transaction.wait_for_response()
 
-                if reason != PubrecReasonCode.SUCCESS:
-                    raise PublishError(reason)
+                if reason != PubackReasonCode.SUCCESS:
+                    if reason == PubackReasonCode.NO_MATCHING_SUBSCRIBERS:
+                        LOGGER.debug(
+                            'No matching subscribers to topic %s.', topic)
+                    else:
+                        raise PublishError(reason)
 
                 self._write_packet(pack_pubrel(transaction.packet_identifier,
                                                PubrelReasonCode.SUCCESS))
@@ -957,17 +1040,45 @@ class Client(object):
         self._connack = unpack_connack(payload)
         self._connack_event.set()
 
+    async def on_publish_qos_2_timer(self, packet_identifier):
+        try:
+            await asyncio.sleep(self.response_timeout)
+            del self._on_publish_qos_2_transactions[packet_identifier]
+
+            LOGGER.debug(
+                'Timeout waiting for PUBREL packet for packet identifier %d.',
+                packet_identifier)
+        except asyncio.CancelledError:
+            pass
+
     async def on_publish(self, flags, payload):
         qos = ((flags >> 1) & 0x3)
 
         try:
-            unpacked = unpack_publish(payload, qos)
+            packet_identifier, topic, message = unpack_publish(payload, qos)
         except MalformedPacketError:
             LOGGER.debug('Discarding malformed PUBLISH packet.')
             return
 
-        # ToDo: Add support for QoS 1 and 2.
-        await self.messages.put(unpacked)
+        if qos == 0:
+            await self.messages.put((topic, message))
+        elif qos == 1:
+            self._write_packet(pack_puback(packet_identifier,
+                                           PubackReasonCode.SUCCESS))
+            await self.messages.put((topic, message))
+        elif qos == 2:
+            if packet_identifier in self._on_publish_qos_2_transactions:
+                reason = PubrecReasonCode.PACKET_IDENTIFIER_IN_USE
+            else:
+                task = asyncio.create_task(
+                    self.on_publish_qos_2_timer(packet_identifier))
+                self._on_publish_qos_2_transactions[packet_identifier] = (
+                    (task, (topic, message)))
+                reason = PubrecReasonCode.SUCCESS
+
+            self._write_packet(pack_pubrec(packet_identifier, reason))
+        else:
+            LOGGER.debug('Received invalid QoS %d.', qos)
 
     def on_puback(self, payload):
         try:
@@ -996,6 +1107,27 @@ class Client(object):
             LOGGER.debug(
                 'Discarding unexpected PUBREC packet with identifier %d.',
                 packet_identifier)
+
+    async def on_pubrel(self, payload):
+        try:
+            packet_identifier, reason = unpack_pubrel(payload)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed PUBREL packet.')
+            return
+
+        if packet_identifier in self._on_publish_qos_2_transactions:
+            if reason == PubrelReasonCode.SUCCESS:
+                self._write_packet(pack_pubcomp(packet_identifier,
+                                                PubcompReasonCode.SUCCESS))
+                task, message = self._on_publish_qos_2_transactions[packet_identifier]
+                task.cancel()
+                await self.messages.put(message)
+
+            del self._on_publish_qos_2_transactions[packet_identifier]
+        else:
+            self._write_packet(
+                pack_pubcomp(packet_identifier,
+                             PubcompReasonCode.PACKET_IDENTIFIER_NOT_FOUND))
 
     def on_pubcomp(self, payload):
         try:
@@ -1078,6 +1210,8 @@ class Client(object):
                 self.on_puback(payload)
             elif packet_type == ControlPacketType.PUBREC:
                 self.on_pubrec(payload)
+            elif packet_type == ControlPacketType.PUBREL:
+                await self.on_pubrel(payload)
             elif packet_type == ControlPacketType.PUBCOMP:
                 self.on_pubcomp(payload)
             elif packet_type == ControlPacketType.SUBACK:

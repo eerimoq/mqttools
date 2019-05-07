@@ -117,8 +117,20 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\x82\n\x00\x02\x00\x00\x04/a/c\x00'),
             # SUBACK
             ('s2c', b'\x90\x04\x00\x02\x00\x00'),
-            # PUBLISH
+            # PUBLISH QoS 0
             ('s2c', b'\x30\x0a\x00\x04/a/b\x00apa'),
+            # PUBLISH QoS 1
+            ('s2c', b'\x32\x0a\x00\x04/a/b\x00\x01\x00c'),
+            # PUBACK
+            ('c2s', b'\x40\x02\x00\x01'),
+            # PUBLISH QoS 2
+            ('s2c', b'\x34\x0a\x00\x04/a/b\x00\x01\x00c'),
+            # PUBREC
+            ('c2s', b'\x50\x02\x00\x01'),
+            # PUBREL
+            ('s2c', b'\x62\x03\x00\x01\x00'),
+            # PUBCOMP
+            ('c2s', b'\x70\x02\x00\x01'),
             # DISCONNECT
             ('c2s', b'\xe0\x02\x00\x00')
         ]
@@ -130,6 +142,12 @@ class MQTToolsTest(unittest.TestCase):
         topic, message = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/a/b')
         self.assertEqual(message, b'apa')
+        topic, message = self.run_until_complete(client.messages.get())
+        self.assertEqual(topic, '/a/b')
+        self.assertEqual(message, b'c')
+        topic, message = self.run_until_complete(client.messages.get())
+        self.assertEqual(topic, '/a/b')
+        self.assertEqual(message, b'c')
         self.run_until_complete(client.stop())
 
     def test_publish_qos_0(self):
@@ -179,7 +197,7 @@ class MQTToolsTest(unittest.TestCase):
             # PUBREC
             ('s2c', b'\x50\x02\x00\x01'),
             # PUBREL
-            ('c2s', b'\x62\x03\x00\x01\x00'),
+            ('c2s', b'\x62\x02\x00\x01'),
             # PUBCOMP
             ('s2c', b'\x70\x02\x00\x01'),
             # DISCONNECT
