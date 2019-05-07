@@ -13,7 +13,7 @@ from mqttools.client import MalformedPacketError
 from mqttools.client import PayloadReader
 
 
-class MQTToolsPackUnpackTest(unittest.TestCase):
+class PackUnpackTest(unittest.TestCase):
 
     def test_pack_connect(self):
         datas = [

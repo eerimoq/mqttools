@@ -821,7 +821,7 @@ class Client(object):
                  will_message=b'',
                  will_qos=0,
                  keep_alive_s=0,
-                 response_timeout=50,
+                 response_timeout=60,
                  topic_aliases=None,
                  **kwargs):
         self._host = host
@@ -866,7 +866,7 @@ class Client(object):
         if keep_alive_s == 0:
             self._ping_period_s = None
         else:
-            self._ping_period_s = max(1, keep_alive_s - response_timeout - 1)
+            self._ping_period_s = max(0.1, keep_alive_s - response_timeout - 1)
 
     @property
     def client_id(self):
@@ -1252,6 +1252,7 @@ class Client(object):
                                        self.response_timeout)
             except asyncio.TimeoutError:
                 LOGGER.warning('Timeout waiting for ping response.')
+                self._writer.close()
 
     async def keep_alive_main(self):
         """Ping the broker periodically to keep the connection alive.
