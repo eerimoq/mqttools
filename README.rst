@@ -96,6 +96,10 @@ An example connecting to an MQTT broker, subscribing to the topic
        while True:
            topic, message = await client.messages.get()
 
+           if topic is None:
+               print('Broker connection lost!')
+               break
+
            print(f'Topic:   {topic}')
            print(f'Message: {message}')
 
