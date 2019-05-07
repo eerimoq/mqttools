@@ -604,7 +604,7 @@ def unpack_publish(payload, qos):
 def pack_puback(packet_identifier, reason):
     size = 2
 
-    if reason != PubrecReasonCode.SUCCESS:
+    if reason != PubackReasonCode.SUCCESS:
         size += 1
         reason = pack_u8(reason)
     else:
@@ -1001,8 +1001,8 @@ class Client(object):
                                                 alias))
                 reason = await transaction.wait_for_response()
 
-                if reason != PubackReasonCode.SUCCESS:
-                    if reason == PubackReasonCode.NO_MATCHING_SUBSCRIBERS:
+                if reason != PubrecReasonCode.SUCCESS:
+                    if reason == PubrecReasonCode.NO_MATCHING_SUBSCRIBERS:
                         LOGGER.debug(
                             'No matching subscribers to topic %s.', topic)
                     else:
