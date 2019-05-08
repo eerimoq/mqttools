@@ -48,10 +48,14 @@ class Broker(threading.Thread):
 
         while self.EXPECTED_DATA_INDEX < len(self.EXPECTED_DATA_STREAM):
             _, data = self.EXPECTED_DATA_STREAM[self.EXPECTED_DATA_INDEX]
-            self.EXPECTED_DATA_INDEX += 1
 
             size = len(data)
             data = client.recv(size)
+
+            if not data:
+                break
+
+            self.EXPECTED_DATA_INDEX += 1
             # print(f'Broker: Received: {data}')
             self.ACTUAL_DATA_STREAM.append(('c2s', data))
 
@@ -391,6 +395,44 @@ class MQTToolsTest(unittest.TestCase):
         topic, message = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/test/mqttools/foo')
         self.assertEqual(message, b'published-with-alias')
+        self.run_until_complete(client.stop())
+
+    def test_resume_session(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT with clean session 0 (to resume) and session
+            # expiry interval 120.
+            (
+                'c2s',
+                b'\x10\x15\x00\x04MQTT\x05\x00\x00\x00\x05\x11\x00\x00\x00\x78'
+                b'\x00\x03bar'
+            ),
+            # CONNACK with no session present
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00'),
+            # CONNECT with clean session 0 (to resume) and session
+            # expiry interval 120.
+            (
+                'c2s',
+                b'\x10\x15\x00\x04MQTT\x05\x00\x00\x00\x05\x11\x00\x00\x00\x78'
+                b'\x00\x03bar'
+            ),
+            # CONNACK with session present
+            ('s2c', b'\x20\x03\x01\x00\x00'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 session_expiry_interval=120)
+
+        with self.assertRaises(mqttools.SessionResumeError):
+            self.run_until_complete(client.start(resume_session=True))
+
+        self.run_until_complete(client.stop())
+        self.broker.wait_for_client_closed()
+        self.run_until_complete(client.start(resume_session=True))
         self.run_until_complete(client.stop())
 
 
