@@ -545,9 +545,9 @@ def unpack_connack(payload):
     return session_present, reason, properties
 
 
-def pack_disconnect():
+def pack_disconnect(reason):
     packed = pack_fixed_header(ControlPacketType.DISCONNECT, 0, 2)
-    packed += struct.pack('B', DisconnectReasonCode.NORMAL_DISCONNECTION)
+    packed += struct.pack('B', reason)
     packed += pack_variable_integer(0)
 
     return packed
@@ -982,6 +982,7 @@ class Client(object):
         self._broker_receive_maximum = None
         self._broker_receive_maximum_semaphore = None
         self._on_publish_qos_2_transactions = None
+        self._disconnect_reason = None
 
         if keep_alive_s == 0:
             self._ping_period_s = None
@@ -1047,6 +1048,7 @@ class Client(object):
         self._broker_receive_maximum = None
         self._broker_receive_maximum_semaphore = None
         self._on_publish_qos_2_transactions = {}
+        self._disconnect_reason = DisconnectReasonCode.NORMAL_DISCONNECTION
         self._reader, self._writer = await asyncio.open_connection(
             self._host,
             self._port,
@@ -1140,7 +1142,11 @@ class Client(object):
         }
 
     def disconnect(self):
-        self._write_packet(pack_disconnect())
+        if self._disconnect_reason is None:
+            return
+
+        self._write_packet(pack_disconnect(self._disconnect_reason))
+        self._disconnect_reason = None
 
     async def subscribe(self, topic, qos):
         """Subscribe to given topic with given QoS.
@@ -1262,14 +1268,9 @@ class Client(object):
 
     async def on_publish(self, flags, payload):
         qos = ((flags >> 1) & 0x3)
-
-        try:
-            packet_identifier, topic, message, properties = unpack_publish(
-                payload,
-                qos)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed PUBLISH packet.')
-            return
+        packet_identifier, topic, message, properties = unpack_publish(
+            payload,
+            qos)
 
         if PropertyIds.TOPIC_ALIAS in properties:
             alias = properties[PropertyIds.TOPIC_ALIAS]
@@ -1310,11 +1311,7 @@ class Client(object):
             LOGGER.debug('Received invalid QoS %d.', qos)
 
     def on_puback(self, payload):
-        try:
-            packet_identifier, reason = unpack_puback(payload)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed PUBACK packet.')
-            return
+        packet_identifier, reason = unpack_puback(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(reason)
@@ -1324,11 +1321,7 @@ class Client(object):
                 packet_identifier)
 
     def on_pubrec(self, payload):
-        try:
-            packet_identifier, reason = unpack_pubrec(payload)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed PUBREC packet.')
-            return
+        packet_identifier, reason = unpack_pubrec(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_response(reason)
@@ -1338,11 +1331,7 @@ class Client(object):
                 packet_identifier)
 
     async def on_pubrel(self, payload):
-        try:
-            packet_identifier, reason = unpack_pubrel(payload)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed PUBREL packet.')
-            return
+        packet_identifier, reason = unpack_pubrel(payload)
 
         if packet_identifier in self._on_publish_qos_2_transactions:
             if reason == PubrelReasonCode.SUCCESS:
@@ -1359,11 +1348,7 @@ class Client(object):
                              PubcompReasonCode.PACKET_IDENTIFIER_NOT_FOUND))
 
     def on_pubcomp(self, payload):
-        try:
-            packet_identifier, reason = unpack_pubcomp(payload)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed PUBCOMP packet.')
-            return
+        packet_identifier, reason = unpack_pubcomp(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(reason)
@@ -1373,11 +1358,7 @@ class Client(object):
                 packet_identifier)
 
     def on_suback(self, payload):
-        try:
-            packet_identifier, properties = unpack_suback(payload)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed SUBACK packet.')
-            return
+        packet_identifier, properties = unpack_suback(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(None)
@@ -1387,11 +1368,7 @@ class Client(object):
                 packet_identifier)
 
     def on_unsuback(self, payload):
-        try:
-            packet_identifier, properties = unpack_unsuback(payload)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed UNSUBACK packet.')
-            return
+        packet_identifier, properties = unpack_unsuback(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(None)
@@ -1404,11 +1381,7 @@ class Client(object):
         self._pingresp_event.set()
 
     async def on_disconnect(self, payload):
-        try:
-            reason, properties = unpack_disconnect(payload)
-        except MalformedPacketError:
-            LOGGER.debug('Discarding malformed DISCONNECT packet.')
-            return
+        reason, properties = unpack_disconnect(payload)
 
         if reason != DisconnectReasonCode.NORMAL_DISCONNECTION:
             LOGGER.info("Abnormal disconnect reason %s.", reason)
@@ -1444,9 +1417,7 @@ class Client(object):
             elif packet_type == ControlPacketType.DISCONNECT:
                 await self.on_disconnect(payload)
             else:
-                LOGGER.warning("Unsupported packet type %s with data %s.",
-                               control_packet_type_to_string(packet_type),
-                               payload.getvalue())
+                raise MalformedPacketError(f'Invalid packet type {packet_type}.')
 
     async def _reader_main(self):
         """Read packets from the broker.
@@ -1457,6 +1428,10 @@ class Client(object):
             await self.reader_loop()
         except Exception as e:
             LOGGER.info('Reader task stopped by %r.', e)
+
+            if isinstance(e, MalformedPacketError):
+                self._disconnect_reason = DisconnectReasonCode.MALFORMED_PACKET
+
             await self._close()
 
     async def keep_alive_loop(self):
@@ -1526,5 +1501,6 @@ class Client(object):
         return packet_identifier
 
     async def _close(self):
+        self.disconnect()
         self._writer.close()
         await self._messages.put((None, None))

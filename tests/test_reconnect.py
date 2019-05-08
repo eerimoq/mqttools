@@ -28,7 +28,7 @@ class Client(threading.Thread):
                                  response_timeout=1,
                                  keep_alive_s=1)
 
-        for _ in range(5):
+        for _ in range(6):
             await client.start()
             self.messages.append(await client.messages.get())
             await client.stop()
@@ -115,11 +115,26 @@ class ReconnectTest(unittest.TestCase):
             b'\x10\x10\x00\x04MQTT\x05\x02\x00\x01\x00\x00\x03goo')
         # CONNACK
         self.assertEqual(client2.send(b'\x20\x03\x00\x00\x00'), 5)
+        # PUBLISH malformed packet with non-UTF-8 topic.
+        self.assertEqual(client2.send(b'\x30\x07\x00\x01\xff\x00apa'), 9)
+        # DISCONNECT with reason malformed packet
+        self.assertEqual(client2.recv(4), b'\xe0\x02\x81\x00')
 
+        # Wait for another connection.
+        client, _ = listener.accept()
         client2.close()
+
+        # CONNECT
+        self.assertEqual(
+            client.recv(18),
+            b'\x10\x10\x00\x04MQTT\x05\x02\x00\x01\x00\x00\x03goo')
+        # CONNACK
+        self.assertEqual(client.send(b'\x20\x03\x00\x00\x00'), 5)
+
+        client.close()
         listener.close()
         client_thread.done.wait()
-        self.assertEqual(client_thread.messages, 5 * [(None, None)])
+        self.assertEqual(client_thread.messages, 6 * [(None, None)])
 
 
 logging.basicConfig(level=logging.DEBUG)
