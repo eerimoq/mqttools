@@ -10,7 +10,7 @@ Features:
 
 - MQTT 5.0 client using ``asyncio``.
 
-- Subscribe to and publish QoS 0 messages.
+- Subscribe to and publish QoS level 0 messages.
 
 - Broker session resume (or clean start support) for less initial
   communication.
@@ -19,8 +19,8 @@ Features:
 
 - Monitor, subscribe and publish command line commands.
 
-QoS 1 and QoS 2 messages are not yet implemented. A client side
-session state storage is required to do so.
+QoS level 1 and 2 messages are not yet supprted. A client side session
+state storage is required to do so.
 
 MQTT 5.0 specification:
 https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
