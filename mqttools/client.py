@@ -975,8 +975,8 @@ class Client(object):
 
     @property
     def messages(self):
-        """Received messages from the broker. Each message is a tuple of the
-        topic and the message.
+        """An asyncio.Queue of received messages from the broker. Each message
+        is a topic-message tuple.
 
         >>> await client.messages.get()
         ('/my/topic', b'my-message')
