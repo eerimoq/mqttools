@@ -864,6 +864,12 @@ class Client(object):
 
         >>> await client.start()
 
+        >>> try:
+        ...     await client.start()
+        ...     print('Session resumed.')
+        ... except SessionResumeError:
+        ...     print('Session not resumed. Subscribe to topics.')
+
         """
 
         self._topic_aliases = {}
