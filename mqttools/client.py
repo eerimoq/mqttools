@@ -935,6 +935,8 @@ class Client(object):
         """The maximum number of QoS 1 and QoS 2 publications the broker is
         willing to process concurrently.
 
+        Only valid when connected to the broker.
+
         """
 
         return self._broker_receive_maximum
@@ -994,7 +996,8 @@ class Client(object):
 
     async def stop(self):
         """Try to cleanly disconnect from the broker and then close the TCP
-        connection.
+        connection. Call `start()` after `stop()` to reconnect to the
+        broker.
 
         >>> await client.stop()
 
