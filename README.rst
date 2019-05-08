@@ -53,7 +53,6 @@ messages are printed to standard output.
    $ mqttools subscribe /test/#
    Topic:   /test
    Message: 11
-
    Topic:   /test/mqttools/foo
    Message: bar
 

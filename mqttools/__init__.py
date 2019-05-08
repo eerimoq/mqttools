@@ -30,10 +30,12 @@ def main():
     from .subparsers import subscribe
     from .subparsers import publish
     from .subparsers import monitor
+    from .subparsers import broker
 
     subscribe.add_subparser(subparsers)
     publish.add_subparser(subparsers)
     monitor.add_subparser(subparsers)
+    broker.add_subparser(subparsers)
 
     args = parser.parse_args()
 
