@@ -939,9 +939,28 @@ class Client(object):
 
         return self._broker_receive_maximum
 
+    @property
+    def messages(self):
+        """An asyncio.Queue of received messages from the broker. Each message
+        is a topic-message tuple.
+
+        >>> await client.messages.get()
+        ('/my/topic', b'my-message')
+
+        A ``(None, None)`` message is put in the queue when the broker
+        connection is lost.
+
+        >>> await client.messages.get()
+        (None, None)
+
+        """
+
+        return self._messages
+
     async def start(self):
         """Open a TCP connection to the broker and perform the MQTT connect
-        procedure.
+        procedure. This method must be called before any `publish()`
+        or `subscribe()` calls. Call `stop()` to close the connection.
 
         >>> await client.start()
 
@@ -972,24 +991,6 @@ class Client(object):
             self._keep_alive_task = None
 
         await self.connect()
-
-    @property
-    def messages(self):
-        """An asyncio.Queue of received messages from the broker. Each message
-        is a topic-message tuple.
-
-        >>> await client.messages.get()
-        ('/my/topic', b'my-message')
-
-        A ``(None, None)`` message is put in the queue if the broker
-        connection is lost.
-
-        >>> await client.messages.get()
-        (None, None)
-
-        """
-
-        return self._messages
 
     async def stop(self):
         """Try to cleanly disconnect from the broker and then close the TCP
