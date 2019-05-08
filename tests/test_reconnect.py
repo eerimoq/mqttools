@@ -28,7 +28,7 @@ class Client(threading.Thread):
                                  response_timeout=1,
                                  keep_alive_s=1)
 
-        for _ in range(3):
+        for _ in range(5):
             await client.start()
             self.messages.append(await client.messages.get())
             await client.stop()
@@ -90,9 +90,36 @@ class ReconnectTest(unittest.TestCase):
         self.assertEqual(client2.send(b'\x20\x03\x00\x00\x00'), 5)
 
         client2.close()
+
+        # Wait for another connection.
+        client, _ = listener.accept()
+
+        # CONNECT
+        self.assertEqual(
+            client.recv(18),
+            b'\x10\x10\x00\x04MQTT\x05\x02\x00\x01\x00\x00\x03goo')
+        # CONNACK
+        self.assertEqual(client.send(b'\x20\x03\x00\x00\x00'), 5)
+        # DISCONNECT
+        self.assertEqual(
+            client.send(b'\xe0\x0f\x80\x0d\x1f\x00\x0aSome error'),
+            17)
+
+        # Wait for another connection.
+        client2, _ = listener.accept()
+        client.close()
+
+        # CONNECT
+        self.assertEqual(
+            client2.recv(18),
+            b'\x10\x10\x00\x04MQTT\x05\x02\x00\x01\x00\x00\x03goo')
+        # CONNACK
+        self.assertEqual(client2.send(b'\x20\x03\x00\x00\x00'), 5)
+
+        client2.close()
         listener.close()
         client_thread.done.wait()
-        self.assertEqual(client_thread.messages, 3 * [(None, None)])
+        self.assertEqual(client_thread.messages, 5 * [(None, None)])
 
 
 logging.basicConfig(level=logging.DEBUG)
