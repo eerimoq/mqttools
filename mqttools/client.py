@@ -864,8 +864,10 @@ class Client(object):
 
         >>> await client.start()
 
+        Trying to resume a session.
+
         >>> try:
-        ...     await client.start()
+        ...     await client.start(resume_session=True)
         ...     print('Session resumed.')
         ... except SessionResumeError:
         ...     print('Session not resumed. Subscribe to topics.')
@@ -1045,7 +1047,7 @@ class Client(object):
                     topic = self._topic_aliases[alias]
                 except KeyError:
                     LOGGER.debug(
-                        'Invalid topic alias %d received from the broker.',
+                        'Unknown topic alias %d received from the broker.',
                         alias)
                     return
             elif 0 < alias <= self._topic_alias_maximum:
