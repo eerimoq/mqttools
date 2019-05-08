@@ -162,6 +162,13 @@ class PubcompReasonCode(enum.IntEnum):
     SUCCESS = 0
     PACKET_IDENTIFIER_NOT_FOUND = 146
 
+
+class QoS(enum.IntEnum):
+    AT_MOST_ONCE  = 0
+    AT_LEAST_ONCE = 1
+    EXACTLY_ONCE  = 2
+
+
 # MQTT 5.0
 PROTOCOL_VERSION = 5
 
@@ -874,7 +881,7 @@ class Client(object):
                         client_id='my-client',
                         will_topic='/my/last/will',
                         will_message=b'my-last-message',
-                        will_qos=1,
+                        will_qos=QoS.EXACTLY_ONCE,
                         keep_alive_s=600,
                         response_timeout=30',
                         topic_aliases=['/my/topic']',
@@ -889,7 +896,7 @@ class Client(object):
                  client_id=None,
                  will_topic='',
                  will_message=b'',
-                 will_qos=0,
+                 will_qos=QoS.AT_MOST_ONCE,
                  keep_alive_s=0,
                  response_timeout=5,
                  topic_aliases=None,
@@ -1102,7 +1109,7 @@ class Client(object):
     async def subscribe(self, topic, qos):
         """Subscribe to given topic with given QoS.
 
-        >>> await client.subscribe('/my/topic', 0)
+        >>> await client.subscribe('/my/topic', QoS.AT_MOST_ONCE)
         >>> await client.messages.get()
         ('/my/topic', b'my-message')
 
@@ -1178,7 +1185,7 @@ class Client(object):
     async def publish(self, topic, message, qos):
         """Publish given message to given topic with given QoS.
 
-        >>> await client.publish('/my/topic', b'my-message', 0)
+        >>> await client.publish('/my/topic', b'my-message', QoS.AT_MOST_ONCE)
 
         """
 

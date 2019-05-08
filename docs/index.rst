@@ -16,3 +16,6 @@ Functions and classes
 
 .. autoclass:: mqttools.Client
     :members:
+
+.. autoclass:: mqttools.QoS
+    :members:

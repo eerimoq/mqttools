@@ -10,6 +10,7 @@ from unittest.mock import patch
 from io import StringIO
 
 import mqttools
+from mqttools import QoS
 
 
 HOST = 'localhost'
@@ -137,8 +138,8 @@ class MQTToolsTest(unittest.TestCase):
 
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.subscribe('/a/b', 0))
-        self.run_until_complete(client.subscribe('/a/c', 0))
+        self.run_until_complete(client.subscribe('/a/b', QoS.AT_MOST_ONCE))
+        self.run_until_complete(client.subscribe('/a/c', QoS.AT_MOST_ONCE))
         topic, message = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/a/b')
         self.assertEqual(message, b'apa')
@@ -170,7 +171,7 @@ class MQTToolsTest(unittest.TestCase):
 
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.subscribe('/a/b', 0))
+        self.run_until_complete(client.subscribe('/a/b', QoS.AT_MOST_ONCE))
         self.run_until_complete(client.unsubscribe('/a/b'))
         self.run_until_complete(client.stop())
 
@@ -188,7 +189,7 @@ class MQTToolsTest(unittest.TestCase):
 
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.publish('/a/b', b'apa', 0))
+        self.run_until_complete(client.publish('/a/b', b'apa', QoS.AT_MOST_ONCE))
         self.run_until_complete(client.stop())
 
     def test_publish_qos_1(self):
@@ -207,7 +208,7 @@ class MQTToolsTest(unittest.TestCase):
 
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.publish('/a/b', b'apa', 1))
+        self.run_until_complete(client.publish('/a/b', b'apa', QoS.AT_LEAST_ONCE))
         self.run_until_complete(client.stop())
 
     def test_publish_qos_2(self):
@@ -230,7 +231,7 @@ class MQTToolsTest(unittest.TestCase):
 
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.publish('/a/b', b'apa', 2))
+        self.run_until_complete(client.publish('/a/b', b'apa', QoS.EXACTLY_ONCE))
         self.run_until_complete(client.stop())
 
     def test_publish_qos_1_no_matching_subscribers(self):
@@ -249,7 +250,7 @@ class MQTToolsTest(unittest.TestCase):
 
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.publish('/a/b', b'apa', 1))
+        self.run_until_complete(client.publish('/a/b', b'apa', QoS.AT_LEAST_ONCE))
         self.run_until_complete(client.stop())
 
     def test_publish_qos_2_no_matching_subscribers(self):
@@ -272,7 +273,7 @@ class MQTToolsTest(unittest.TestCase):
 
         client = mqttools.Client(*self.broker.address, 'bar')
         self.run_until_complete(client.start())
-        self.run_until_complete(client.publish('/a/b', b'apa', 2))
+        self.run_until_complete(client.publish('/a/b', b'apa', QoS.EXACTLY_ONCE))
         self.run_until_complete(client.stop())
 
     def test_publish_qos_1_packet_identifier_in_use(self):
@@ -293,7 +294,9 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.start())
 
         with self.assertRaises(mqttools.PublishError) as cm:
-            self.run_until_complete(client.publish('/a/b', b'apa', 1))
+            self.run_until_complete(client.publish('/a/b',
+                                                   b'apa',
+                                                   QoS.AT_LEAST_ONCE))
 
         self.assertEqual(str(cm.exception), 'PACKET_IDENTIFIER_IN_USE(145)')
         self.run_until_complete(client.stop())
@@ -316,7 +319,9 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.start())
 
         with self.assertRaises(mqttools.PublishError) as cm:
-            self.run_until_complete(client.publish('/a/b', b'apa', 2))
+            self.run_until_complete(client.publish('/a/b',
+                                                   b'apa',
+                                                   QoS.EXACTLY_ONCE))
 
         self.assertEqual(str(cm.exception), 'PACKET_IDENTIFIER_IN_USE(145)')
         self.run_until_complete(client.stop())
@@ -343,7 +348,9 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.start())
 
         with self.assertRaises(mqttools.PublishError) as cm:
-            self.run_until_complete(client.publish('/a/b', b'apa', 2))
+            self.run_until_complete(client.publish('/a/b',
+                                                   b'apa',
+                                                   QoS.EXACTLY_ONCE))
 
         self.assertEqual(str(cm.exception), 'PACKET_IDENTIFIER_NOT_FOUND(146)')
         self.run_until_complete(client.stop())
@@ -550,8 +557,8 @@ class MQTToolsTest(unittest.TestCase):
                                      '/foo'
                                  ])
         self.run_until_complete(client.start())
-        self.run_until_complete(client.publish('/foo', b'apa', 0))
-        self.run_until_complete(client.publish('/bar', b'cat', 0))
+        self.run_until_complete(client.publish('/foo', b'apa', QoS.AT_MOST_ONCE))
+        self.run_until_complete(client.publish('/bar', b'cat', QoS.AT_MOST_ONCE))
         self.run_until_complete(client.stop())
 
     def test_connack_unspecified_error(self):
@@ -598,7 +605,8 @@ class MQTToolsTest(unittest.TestCase):
                                  'bar',
                                  topic_alias_maximum=5)
         self.run_until_complete(client.start())
-        self.run_until_complete(client.subscribe('/test/mqttools/foo', 0))
+        self.run_until_complete(client.subscribe('/test/mqttools/foo',
+                                                 QoS.AT_MOST_ONCE))
         topic, message = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/test/mqttools/foo')
         self.assertEqual(message, b'sets-alias-in-client')

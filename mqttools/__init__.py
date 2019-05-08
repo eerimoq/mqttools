@@ -7,6 +7,7 @@ from .client import Client
 from .client import MalformedPacketError
 from .client import ConnectError
 from .client import PublishError
+from .client import QoS
 
 
 def main():
