@@ -16,6 +16,17 @@ Features:
 MQTT 5.0 specification:
 https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
 
+Project homepage: https://github.com/eerimoq/mqttools
+
+Documentation: https://mqttools.readthedocs.org/en/latest
+
+Installation
+============
+
+.. code-block:: python
+
+    pip install mqttools
+
 Examples
 ========
 
