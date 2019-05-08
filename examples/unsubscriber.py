@@ -10,7 +10,7 @@ async def unsubscriber():
     await client.start()
 
     print('Subscribing to /test/mqttools/foo.')
-    await client.subscribe('/test/mqttools/foo', 0)
+    await client.subscribe('/test/mqttools/foo')
     topic, message = await client.messages.get()
 
     print(f'Topic:   {topic}')

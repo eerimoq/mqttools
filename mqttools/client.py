@@ -207,6 +207,10 @@ class ConnectError(Error):
         return message
 
 
+class SessionResumeError(Error):
+    pass
+
+
 class PublishError(Error):
 
     def __init__(self, reason):
@@ -467,12 +471,17 @@ def unpack_packet_type(payload):
 
 
 def pack_connect(client_id,
+                 clean_start,
                  will_topic,
                  will_message,
                  will_qos,
                  keep_alive_s,
                  properties):
-    flags = CLEAN_START
+    flags = 0
+
+    if clean_start:
+        flags |= CLEAN_START
+
     payload_length = len(client_id) + 2
 
     if will_topic and will_message:
@@ -580,14 +589,14 @@ def unpack_disconnect(payload):
     return reason, properties
 
 
-def pack_subscribe(topic, qos, packet_identifier):
+def pack_subscribe(topic, packet_identifier):
     packed_topic = pack_string(topic)
     packed = pack_fixed_header(ControlPacketType.SUBSCRIBE,
                                2,
                                len(packed_topic) + 4)
     packed += struct.pack('>HB', packet_identifier, 0)
     packed += packed_topic
-    packed += struct.pack('B', qos)
+    packed += struct.pack('B', 0)
 
     return packed
 
@@ -627,7 +636,7 @@ def unpack_unsuback(payload):
     return packet_identifier, properties
 
 
-def pack_publish(topic, message, qos, packet_identifier, alias):
+def pack_publish(topic, message, alias):
     if alias is None:
         properties = b'\x00'
     else:
@@ -636,16 +645,8 @@ def pack_publish(topic, message, qos, packet_identifier, alias):
 
     packed_topic = pack_string(topic)
     size = len(packed_topic) + len(message) + len(properties)
-
-    if qos > 0:
-        size += 2
-
-    packed = pack_fixed_header(ControlPacketType.PUBLISH, qos << 1, size)
+    packed = pack_fixed_header(ControlPacketType.PUBLISH, 0, size)
     packed += packed_topic
-
-    if qos > 0:
-        packed += pack_u16(packet_identifier)
-
     packed += properties
     packed += message
 
@@ -655,10 +656,8 @@ def pack_publish(topic, message, qos, packet_identifier, alias):
 def unpack_publish(payload, qos):
     topic = unpack_string(payload)
 
-    if qos == 0:
-        packet_identifier = None
-    else:
-        packet_identifier = unpack_u16(payload)
+    if qos > 0:
+        raise MalformedPacketError('Only QoS 0 is supported.')
 
     properties = unpack_properties(
         'PUBLISH',
@@ -676,167 +675,7 @@ def unpack_publish(payload, qos):
 
     message = payload.read_all()
 
-    return packet_identifier, topic, message, properties
-
-
-def pack_puback(packet_identifier, reason):
-    size = 2
-
-    if reason != PubackReasonCode.SUCCESS:
-        size += 1
-        reason = pack_u8(reason)
-    else:
-        reason = b''
-
-    packed = pack_fixed_header(ControlPacketType.PUBACK, 0, size)
-    packed += pack_u16(packet_identifier)
-    packed += reason
-
-    return packed
-
-
-def unpack_puback(payload):
-    packet_identifier = unpack_u16(payload)
-
-    if payload.is_data_available():
-        reason = payload.read(1)[0]
-    else:
-        reason = 0
-
-    try:
-        reason = PubackReasonCode(reason)
-    except ValueError:
-        pass
-
-    if payload.is_data_available():
-        unpack_properties('PUBACK',
-                          [
-                              PropertyIds.REASON_STRING,
-                              PropertyIds.USER_PROPERTY
-                          ],
-                          payload)
-
-    return packet_identifier, reason
-
-
-def pack_pubrec(packet_identifier, reason):
-    size = 2
-
-    if reason != PubrecReasonCode.SUCCESS:
-        size += 1
-        reason = pack_u8(reason)
-    else:
-        reason = b''
-
-    packed = pack_fixed_header(ControlPacketType.PUBREC, 0, size)
-    packed += pack_u16(packet_identifier)
-    packed += reason
-
-    return packed
-
-
-def unpack_pubrec(payload):
-    packet_identifier = unpack_u16(payload)
-
-    if payload.is_data_available():
-        reason = payload.read(1)[0]
-    else:
-        reason = 0
-
-    try:
-        reason = PubrecReasonCode(reason)
-    except ValueError:
-        pass
-
-    if payload.is_data_available():
-        unpack_properties('PUBREC',
-                          [
-                              PropertyIds.REASON_STRING,
-                              PropertyIds.USER_PROPERTY
-                          ],
-                          payload)
-
-    return packet_identifier, reason
-
-
-def pack_pubrel(packet_identifier, reason):
-    size = 2
-
-    if reason != PubrelReasonCode.SUCCESS:
-        size += 1
-        reason = pack_u8(reason)
-    else:
-        reason = b''
-
-    packed = pack_fixed_header(ControlPacketType.PUBREL, 2, size)
-    packed += pack_u16(packet_identifier)
-    packed += reason
-
-    return packed
-
-
-def unpack_pubrel(payload):
-    packet_identifier = unpack_u16(payload)
-
-    if payload.is_data_available():
-        reason = payload.read(1)[0]
-    else:
-        reason = 0
-
-    try:
-        reason = PubrelReasonCode(reason)
-    except ValueError:
-        pass
-
-    if payload.is_data_available():
-        unpack_properties('PUBREL',
-                          [
-                              PropertyIds.REASON_STRING,
-                              PropertyIds.USER_PROPERTY
-                          ],
-                          payload)
-
-    return packet_identifier, reason
-
-
-def pack_pubcomp(packet_identifier, reason):
-    size = 2
-
-    if reason != PubcompReasonCode.SUCCESS:
-        size += 1
-        reason = pack_u8(reason)
-    else:
-        reason = b''
-
-    packed = pack_fixed_header(ControlPacketType.PUBCOMP, 0, size)
-    packed += pack_u16(packet_identifier)
-    packed += reason
-
-    return packed
-
-
-def unpack_pubcomp(payload):
-    packet_identifier = unpack_u16(payload)
-
-    if payload.is_data_available():
-        reason = payload.read(1)[0]
-    else:
-        reason = 0
-
-    try:
-        reason = PubcompReasonCode(reason)
-    except ValueError:
-        pass
-
-    if payload.is_data_available():
-        unpack_properties('PUBCOMP',
-                          [
-                              PropertyIds.REASON_STRING,
-                              PropertyIds.USER_PROPERTY
-                          ],
-                          payload)
-
-    return packet_identifier, reason
+    return topic, message, properties
 
 
 def pack_pingreq():
@@ -904,6 +743,9 @@ class Client(object):
     `topic_alias_maximum` is the maximum number of topic aliases the
     client is willing to assign on request from the broker.
 
+    `session_expiry_interval` is the session expiry time in
+    seconds. Give as 0 to remove the session when the connection ends.
+
     `kwargs` are passed to `asyncio.open_connection()`.
 
     Create a client with default configuration:
@@ -937,6 +779,7 @@ class Client(object):
                  response_timeout=5,
                  topic_aliases=None,
                  topic_alias_maximum=0,
+                 session_expiry_interval=0,
                  **kwargs):
         self._host = host
         self._port = port
@@ -959,6 +802,10 @@ class Client(object):
             self._connect_properties[PropertyIds.TOPIC_ALIAS_MAXIMUM] = (
                 topic_alias_maximum)
 
+        if session_expiry_interval > 0:
+            self._connect_properties[PropertyIds.SESSION_EXPIRY_INTERVAL] = (
+                session_expiry_interval)
+
         if topic_aliases is None:
             topic_aliases = []
 
@@ -979,9 +826,6 @@ class Client(object):
         self._messages = None
         self._connack = None
         self._next_packet_identifier = None
-        self._broker_receive_maximum = None
-        self._broker_receive_maximum_semaphore = None
-        self._on_publish_qos_2_transactions = None
         self._disconnect_reason = None
 
         if keep_alive_s == 0:
@@ -996,17 +840,6 @@ class Client(object):
         """
 
         return self._client_id
-
-    @property
-    def broker_receive_maximum(self):
-        """The maximum number of QoS 1 and QoS 2 publications the broker is
-        willing to process concurrently.
-
-        Only valid when connected to the broker.
-
-        """
-
-        return self._broker_receive_maximum
 
     @property
     def messages(self):
@@ -1026,10 +859,15 @@ class Client(object):
 
         return self._messages
 
-    async def start(self):
+    async def start(self, resume_session=False):
         """Open a TCP connection to the broker and perform the MQTT connect
         procedure. This method must be called before any `publish()`
         or `subscribe()` calls. Call `stop()` to close the connection.
+
+        If `resume_session` is ``True``, the client tries to resume
+        the last session in the broker. A `SessionResumeError`
+        exception is raised if the resume fails, and a new session has
+        been created instead.
 
         >>> await client.start()
 
@@ -1045,10 +883,10 @@ class Client(object):
         self._messages = asyncio.Queue()
         self._connack = None
         self._next_packet_identifier = 1
-        self._broker_receive_maximum = None
-        self._broker_receive_maximum_semaphore = None
-        self._on_publish_qos_2_transactions = {}
         self._disconnect_reason = DisconnectReasonCode.NORMAL_DISCONNECTION
+
+        LOGGER.info('Connecting to %s:%s.', self._host, self._port)
+
         self._reader, self._writer = await asyncio.open_connection(
             self._host,
             self._port,
@@ -1060,7 +898,7 @@ class Client(object):
         else:
             self._keep_alive_task = None
 
-        await self.connect()
+        await self.connect(resume_session)
 
     async def stop(self):
         """Try to cleanly disconnect from the broker and then close the TCP
@@ -1093,9 +931,10 @@ class Client(object):
 
         self._writer.close()
 
-    async def connect(self):
+    async def connect(self, resume_session):
         self._connack_event.clear()
         self._write_packet(pack_connect(self._client_id,
+                                        not resume_session,
                                         self._will_topic,
                                         self._will_message,
                                         self._will_qos,
@@ -1108,19 +947,10 @@ class Client(object):
         except asyncio.TimeoutError:
             raise Error('Timeout waiting for CONNACK from the broker.')
 
-        _, reason, properties = self._connack
+        session_present, reason, properties = self._connack
 
         if reason != ConnectReasonCode.SUCCESS:
             raise ConnectError(reason)
-
-        # Receive maximum.
-        if PropertyIds.RECEIVE_MAXIMUM in properties:
-            self._broker_receive_maximum = properties[PropertyIds.RECEIVE_MAXIMUM]
-        else:
-            self._broker_receive_maximum = 65535
-
-        self._broker_receive_maximum_semaphore = (
-            asyncio.Semaphore(self._broker_receive_maximum))
 
         # Topic alias maximum.
         if PropertyIds.TOPIC_ALIAS_MAXIMUM in properties:
@@ -1141,6 +971,11 @@ class Client(object):
             if alias < self._broker_topic_alias_maximum + 1
         }
 
+        if resume_session and not session_present:
+            LOGGER.info('No session to resume.')
+
+            raise SessionResumeError('No session to resume.')
+
     def disconnect(self):
         if self._disconnect_reason is None:
             return
@@ -1148,10 +983,10 @@ class Client(object):
         self._write_packet(pack_disconnect(self._disconnect_reason))
         self._disconnect_reason = None
 
-    async def subscribe(self, topic, qos):
-        """Subscribe to given topic with given QoS.
+    async def subscribe(self, topic):
+        """Subscribe to given topic with QoS 0.
 
-        >>> await client.subscribe('/my/topic', QoS.AT_MOST_ONCE)
+        >>> await client.subscribe('/my/topic')
         >>> await client.messages.get()
         ('/my/topic', b'my-message')
 
@@ -1159,7 +994,6 @@ class Client(object):
 
         with Transaction(self) as transaction:
             self._write_packet(pack_subscribe(topic,
-                                              qos,
                                               transaction.packet_identifier))
             await transaction.wait_until_completed()
 
@@ -1175,59 +1009,10 @@ class Client(object):
                                                 transaction.packet_identifier))
             await transaction.wait_until_completed()
 
-    def publish_qos_0(self, topic, alias, message):
-        with Transaction(self) as transaction:
-            self._write_packet(pack_publish(topic,
-                                            message,
-                                            0,
-                                            transaction.packet_identifier,
-                                            alias))
+    def publish(self, topic, message):
+        """Publish given message to given topic with QoS 0.
 
-    async def publish_qos_1(self, topic, alias, message):
-        async with self._broker_receive_maximum_semaphore:
-            with Transaction(self) as transaction:
-                self._write_packet(pack_publish(topic,
-                                                message,
-                                                1,
-                                                transaction.packet_identifier,
-                                                alias))
-                reason = await transaction.wait_until_completed()
-
-                if reason != PubackReasonCode.SUCCESS:
-                    if reason == PubackReasonCode.NO_MATCHING_SUBSCRIBERS:
-                        LOGGER.debug(
-                            'No matching subscribers to topic %s.', topic)
-                    else:
-                        raise PublishError(reason)
-
-    async def publish_qos_2(self, topic, alias, message):
-        async with self._broker_receive_maximum_semaphore:
-            with Transaction(self) as transaction:
-                self._write_packet(pack_publish(topic,
-                                                message,
-                                                2,
-                                                transaction.packet_identifier,
-                                                alias))
-                reason = await transaction.wait_for_response()
-
-                if reason != PubrecReasonCode.SUCCESS:
-                    if reason == PubrecReasonCode.NO_MATCHING_SUBSCRIBERS:
-                        LOGGER.debug(
-                            'No matching subscribers to topic %s.', topic)
-                    else:
-                        raise PublishError(reason)
-
-                self._write_packet(pack_pubrel(transaction.packet_identifier,
-                                               PubrelReasonCode.SUCCESS))
-                reason = await transaction.wait_until_completed()
-
-                if reason != PubcompReasonCode.SUCCESS:
-                    raise PublishError(reason)
-
-    async def publish(self, topic, message, qos):
-        """Publish given message to given topic with given QoS.
-
-        >>> await client.publish('/my/topic', b'my-message', QoS.AT_MOST_ONCE)
+        >>> client.publish('/my/topic', b'my-message')
 
         """
 
@@ -1239,14 +1024,7 @@ class Client(object):
         else:
             alias = None
 
-        if qos == 0:
-            self.publish_qos_0(topic, alias, message)
-        elif qos == 1:
-            await self.publish_qos_1(topic, alias, message)
-        elif qos == 2:
-            await self.publish_qos_2(topic, alias, message)
-        else:
-            raise Error(f'Invalid QoS {qos}.')
+        self._write_packet(pack_publish(topic, message, alias))
 
         if (alias is not None) and (topic != ''):
             self._registered_broker_topic_aliases.add(alias)
@@ -1255,22 +1033,10 @@ class Client(object):
         self._connack = unpack_connack(payload)
         self._connack_event.set()
 
-    async def on_publish_qos_2_timer(self, packet_identifier):
-        try:
-            await asyncio.sleep(self.response_timeout)
-            del self._on_publish_qos_2_transactions[packet_identifier]
-
-            LOGGER.debug(
-                'Timeout waiting for PUBREL packet for packet identifier %d.',
-                packet_identifier)
-        except asyncio.CancelledError:
-            pass
-
     async def on_publish(self, flags, payload):
-        qos = ((flags >> 1) & 0x3)
-        packet_identifier, topic, message, properties = unpack_publish(
+        topic, message, properties = unpack_publish(
             payload,
-            qos)
+            (flags >> 1) & 0x3)
 
         if PropertyIds.TOPIC_ALIAS in properties:
             alias = properties[PropertyIds.TOPIC_ALIAS]
@@ -1290,72 +1056,7 @@ class Client(object):
                              alias)
                 return
 
-        if qos == 0:
-            await self._messages.put((topic, message))
-        elif qos == 1:
-            self._write_packet(pack_puback(packet_identifier,
-                                           PubackReasonCode.SUCCESS))
-            await self._messages.put((topic, message))
-        elif qos == 2:
-            if packet_identifier in self._on_publish_qos_2_transactions:
-                reason = PubrecReasonCode.PACKET_IDENTIFIER_IN_USE
-            else:
-                task = asyncio.create_task(
-                    self.on_publish_qos_2_timer(packet_identifier))
-                self._on_publish_qos_2_transactions[packet_identifier] = (
-                    (task, (topic, message)))
-                reason = PubrecReasonCode.SUCCESS
-
-            self._write_packet(pack_pubrec(packet_identifier, reason))
-        else:
-            raise MalformedPacketError(f'Invalid QoS {qos}.')
-
-    def on_puback(self, payload):
-        packet_identifier, reason = unpack_puback(payload)
-
-        if packet_identifier in self.transactions:
-            self.transactions[packet_identifier].set_completed(reason)
-        else:
-            LOGGER.debug(
-                'Discarding unexpected PUBACK packet with identifier %d.',
-                packet_identifier)
-
-    def on_pubrec(self, payload):
-        packet_identifier, reason = unpack_pubrec(payload)
-
-        if packet_identifier in self.transactions:
-            self.transactions[packet_identifier].set_response(reason)
-        else:
-            LOGGER.debug(
-                'Discarding unexpected PUBREC packet with identifier %d.',
-                packet_identifier)
-
-    async def on_pubrel(self, payload):
-        packet_identifier, reason = unpack_pubrel(payload)
-
-        if packet_identifier in self._on_publish_qos_2_transactions:
-            if reason == PubrelReasonCode.SUCCESS:
-                self._write_packet(pack_pubcomp(packet_identifier,
-                                                PubcompReasonCode.SUCCESS))
-                task, message = self._on_publish_qos_2_transactions[packet_identifier]
-                task.cancel()
-                await self._messages.put(message)
-
-            del self._on_publish_qos_2_transactions[packet_identifier]
-        else:
-            self._write_packet(
-                pack_pubcomp(packet_identifier,
-                             PubcompReasonCode.PACKET_IDENTIFIER_NOT_FOUND))
-
-    def on_pubcomp(self, payload):
-        packet_identifier, reason = unpack_pubcomp(payload)
-
-        if packet_identifier in self.transactions:
-            self.transactions[packet_identifier].set_completed(reason)
-        else:
-            LOGGER.debug(
-                'Discarding unexpected PUBCOMP packet with identifier %d.',
-                packet_identifier)
+        await self._messages.put((topic, message))
 
     def on_suback(self, payload):
         packet_identifier, properties = unpack_suback(payload)
@@ -1400,14 +1101,6 @@ class Client(object):
                 self.on_connack(payload)
             elif packet_type == ControlPacketType.PUBLISH:
                 await self.on_publish(flags, payload)
-            elif packet_type == ControlPacketType.PUBACK:
-                self.on_puback(payload)
-            elif packet_type == ControlPacketType.PUBREC:
-                self.on_pubrec(payload)
-            elif packet_type == ControlPacketType.PUBREL:
-                await self.on_pubrel(payload)
-            elif packet_type == ControlPacketType.PUBCOMP:
-                self.on_pubcomp(payload)
             elif packet_type == ControlPacketType.SUBACK:
                 self.on_suback(payload)
             elif packet_type == ControlPacketType.UNSUBACK:
@@ -1417,7 +1110,8 @@ class Client(object):
             elif packet_type == ControlPacketType.DISCONNECT:
                 await self.on_disconnect(payload)
             else:
-                raise MalformedPacketError(f'Invalid packet type {packet_type}.')
+                raise MalformedPacketError(
+                    f'Unsupported or invalid packet type {packet_type}.')
 
     async def _reader_main(self):
         """Read packets from the broker.

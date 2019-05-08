@@ -10,7 +10,7 @@ async def main():
     client = mqttools.Client(HOST, PORT)
     await client.start()
     print(f'Connected to {HOST}:{PORT}.')
-    await client.subscribe('/mqttools/incrementer/value/request', 0)
+    await client.subscribe('/mqttools/incrementer/value/request')
 
     print('Subscribed to topic /mqttools/incrementer/value/request.')
 
@@ -25,9 +25,8 @@ async def main():
         print(f'Request count:  {count}')
         count += 1
         print(f'Response count: {count}')
-        await client.publish('/mqttools/counter-client/value/response',
-                             str(count).encode('ascii'),
-                             0)
+        client.publish('/mqttools/counter-client/value/response',
+                       str(count).encode('ascii'))
 
 
 asyncio.run(main())

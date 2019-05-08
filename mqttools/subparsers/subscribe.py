@@ -4,7 +4,7 @@ from ..client import Client
 from . import try_decode
 
 
-async def subscriber(host, port, client_id, topic, qos, keep_alive_s):
+async def subscriber(host, port, client_id, topic, keep_alive_s):
     client = Client(host,
                     port,
                     client_id,
@@ -12,7 +12,7 @@ async def subscriber(host, port, client_id, topic, qos, keep_alive_s):
                     topic_alias_maximum=10)
 
     await client.start()
-    await client.subscribe(topic, qos)
+    await client.subscribe(topic)
 
     while True:
         topic, message = await client.messages.get()
@@ -30,7 +30,6 @@ def _do_subscribe(args):
                            args.port,
                            args.client_id,
                            args.topic,
-                           args.qos,
                            args.keep_alive))
 
 
@@ -46,10 +45,6 @@ def add_subparser(subparsers):
                            help='Broker port (default: 1883).')
     subparser.add_argument('--client-id',
                            help='Client id (default: mqttools-<UUID[0..14]>).')
-    subparser.add_argument('--qos',
-                           type=int,
-                           default=0,
-                           help='Quality of service (default: 0).')
     subparser.add_argument('--keep-alive',
                            type=int,
                            default=0,

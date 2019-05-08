@@ -6,7 +6,8 @@ MQTT Tools
 
 Features:
 
-- ``asyncio`` MQTT 5.0 client.
+- ``asyncio`` MQTT 5.0 client. Only QoS 0 (fire and forget) is
+  supported.
 
 Requires Python 3.7 or later!
 
@@ -60,7 +61,7 @@ benchmark the client and the broker.
 
 .. code-block:: text
 
-   $ mqttools publish --count 100 --qos 1 /test/mqttools/foo
+   $ mqttools publish --count 100 /test/mqttools/foo
    Published 100 message(s) in 0.39 seconds from 10 concurrent task(s).
 
 Monitor
@@ -99,7 +100,7 @@ An example connecting to an MQTT broker, subscribing to the topic
        client = mqttools.Client('broker.hivemq.com', 1883)
 
        await client.start()
-       await client.subscribe('/test/#', 0)
+       await client.subscribe('/test/#')
 
        while True:
            topic, message = await client.messages.get()
@@ -128,7 +129,7 @@ An example connecting to an MQTT broker and publishing the message
        client = mqttools.Client('broker.hivemq.com', 1883)
 
        await client.start()
-       await client.publish('/test/mqttools/foo', b'bar', 0)
+       await client.publish('/test/mqttools/foo', b'bar')
        await client.stop()
 
    asyncio.run(publisher())

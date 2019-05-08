@@ -9,10 +9,11 @@ async def subscriber():
 
     # Subscribe to three topics in parallel.
     await asyncio.gather(
-        client.subscribe('$SYS/broker/uptime', 0),
-        client.subscribe('$SYS/broker/bytes/sent', 0),
-        client.subscribe('/test/mqttools/foo', 0)
+        client.subscribe('$SYS/#'),
+        client.subscribe('/test/mqttools/foo')
     )
+
+    print('Waiting for messages.')
 
     while True:
         topic, message = await client.messages.get()

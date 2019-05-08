@@ -6,6 +6,7 @@ from .version import __version__
 from .client import Client
 from .client import MalformedPacketError
 from .client import ConnectError
+from .client import SessionResumeError
 from .client import PublishError
 from .client import QoS
 

@@ -6,7 +6,7 @@ async def publisher():
     client = mqttools.Client('broker.hivemq.com', 1883)
 
     await client.start()
-    await client.publish('/test/mqttools/foo', b'bar', 0)
+    client.publish('/test/mqttools/foo', b'bar')
     await client.stop()
     print("Successfully published b'bar' on /test/mqttools/foo.")
 

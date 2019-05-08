@@ -35,7 +35,7 @@ class ClientThread(threading.Thread):
                         topic_alias_maximum=10)
 
         await client.start()
-        await asyncio.gather(*[client.subscribe(topic, 0)
+        await asyncio.gather(*[client.subscribe(topic)
                                for topic in self._topics])
 
         while True:
@@ -235,5 +235,5 @@ def add_subparser(subparsers):
     subparser.add_argument(
         'subscribe',
         nargs='*',
-        help='Subscribe to given topic(s) <topic>[:<qos>]. QoS is 0 by default.')
+        help='Subscribe to given topic(s) <topic>.')
     subparser.set_defaults(func=_do_monitor)
