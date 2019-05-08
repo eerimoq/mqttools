@@ -1403,7 +1403,7 @@ class Client(object):
     def on_pingresp(self):
         self._pingresp_event.set()
 
-    def on_disconnect(self, payload):
+    async def on_disconnect(self, payload):
         try:
             reason, properties = unpack_disconnect(payload)
         except MalformedPacketError:
@@ -1416,6 +1416,8 @@ class Client(object):
         if PropertyIds.REASON_STRING in properties:
             reason_string = properties[PropertyIds.REASON_STRING]
             LOGGER.info("Disconnect reason string '%s'.", reason_string)
+
+        await self._close()
 
     async def reader_loop(self):
         while True:
@@ -1440,7 +1442,7 @@ class Client(object):
             elif packet_type == ControlPacketType.PINGRESP:
                 self.on_pingresp()
             elif packet_type == ControlPacketType.DISCONNECT:
-                self.on_disconnect()
+                await self.on_disconnect(payload)
             else:
                 LOGGER.warning("Unsupported packet type %s with data %s.",
                                control_packet_type_to_string(packet_type),
@@ -1455,8 +1457,7 @@ class Client(object):
             await self.reader_loop()
         except Exception as e:
             LOGGER.info('Reader task stopped by %r.', e)
-            self._writer.close()
-            await self._messages.put((None, None))
+            await self._close()
 
     async def keep_alive_loop(self):
         while True:
@@ -1478,8 +1479,7 @@ class Client(object):
             await self.keep_alive_loop()
         except Exception as e:
             LOGGER.info('Keep alive task stopped by %r.', e)
-            self._writer.close()
-            await self._messages.put((None, None))
+            await self._close()
 
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):
@@ -1524,3 +1524,7 @@ class Client(object):
             self._next_packet_identifier = 1
 
         return packet_identifier
+
+    async def _close(self):
+        self._writer.close()
+        await self._messages.put((None, None))
