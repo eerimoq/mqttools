@@ -170,8 +170,10 @@ class QoS(enum.IntEnum):
 
     AT_MOST_ONCE  = 0
     "At most once (QoS 0)."
+
     AT_LEAST_ONCE = 1
     "At least once (QoS 1)."
+
     EXACTLY_ONCE  = 2
     "Exactly once (QoS 2)."
 
