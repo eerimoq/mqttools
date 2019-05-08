@@ -164,6 +164,10 @@ class PubcompReasonCode(enum.IntEnum):
 
 
 class QoS(enum.IntEnum):
+    """Quality of service levels.
+
+    """
+
     AT_MOST_ONCE  = 0
     AT_LEAST_ONCE = 1
     EXACTLY_ONCE  = 2
