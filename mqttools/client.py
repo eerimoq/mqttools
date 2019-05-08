@@ -1308,7 +1308,7 @@ class Client(object):
 
             self._write_packet(pack_pubrec(packet_identifier, reason))
         else:
-            LOGGER.debug('Received invalid QoS %d.', qos)
+            raise MalformedPacketError(f'Invalid QoS {qos}.')
 
     def on_puback(self, payload):
         packet_identifier, reason = unpack_puback(payload)
