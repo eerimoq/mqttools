@@ -700,25 +700,16 @@ class Transaction(object):
         if self.packet_identifier in self._client.transactions:
             del self._client.transactions[self.packet_identifier]
 
-    async def wait_for_response(self):
-        response = await self.wait_until_completed()
-        self._event.clear()
-
-        return response
-
     async def wait_until_completed(self):
         await asyncio.wait_for(self._event.wait(),
                                self._client.response_timeout)
 
         return self._response
 
-    def set_response(self, response):
-        self._response = response
-        self._event.set()
-
     def set_completed(self, response):
         del self._client.transactions[self.packet_identifier]
-        self.set_response(response)
+        self._response = response
+        self._event.set()
 
 
 class Client(object):
