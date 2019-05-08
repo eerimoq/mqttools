@@ -4,14 +4,11 @@
 MQTT Tools
 ==========
 
-Requires Python 3.7 or later!
-
-NOTE: This project is far from complete. Lots of MQTT features are not
-implemented yet, and those implemented are probably buggy.
-
 Features:
 
-- ``asyncio`` MQTT 5.0 client (under development).
+- ``asyncio`` MQTT 5.0 client.
+
+Requires Python 3.7 or later!
 
 MQTT 5.0 specification:
 https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
