@@ -717,8 +717,8 @@ class Client(object):
 
     `host` and `port` are the host and port of the broker.
 
-    `client_id` is the client id string. If ``None``, it is created on
-    the form ``mqttools-<UUID[0..14]>``.
+    `client_id` is the client id string. If ``None``, a random client
+    id is generated on the form ``mqttools-<UUID[0..14]>``.
 
     `will_topic`, `will_message` and `will_qos` are used to ask the
     broker to send a will when the session ends.
@@ -735,9 +735,10 @@ class Client(object):
     client is willing to assign on request from the broker.
 
     `session_expiry_interval` is the session expiry time in
-    seconds. Give as 0 to remove the session when the connection ends.
+    seconds. Give as 0 to remove the session in the broker when the
+    connection ends.
 
-    `kwargs` are passed to `asyncio.open_connection()`.
+    `kwargs` are passed to ``asyncio.open_connection()``.
 
     Create a client with default configuration:
 
@@ -755,6 +756,7 @@ class Client(object):
                         response_timeout=30',
                         topic_aliases=['/my/topic']',
                         topic_alias_maximum=100,
+                        session_expiry_interval=1800,
                         ssl=True)
 
     """
@@ -834,8 +836,8 @@ class Client(object):
 
     @property
     def messages(self):
-        """An asyncio.Queue of received messages from the broker. Each message
-        is a topic-message tuple.
+        """An ``asyncio.Queue`` of received messages from the broker. Each
+        message is a topic-message tuple.
 
         >>> await client.messages.get()
         ('/my/topic', b'my-message')

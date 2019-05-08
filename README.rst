@@ -129,7 +129,7 @@ An example connecting to an MQTT broker and publishing the message
        client = mqttools.Client('broker.hivemq.com', 1883)
 
        await client.start()
-       await client.publish('/test/mqttools/foo', b'bar')
+       client.publish('/test/mqttools/foo', b'bar')
        await client.stop()
 
    asyncio.run(publisher())
