@@ -553,6 +553,33 @@ def pack_disconnect():
     return packed
 
 
+def unpack_disconnect(payload):
+    if payload.is_data_available():
+        reason = payload.read(1)[0]
+    else:
+        reason = 0
+
+    try:
+        reason = DisconnectReasonCode(reason)
+    except ValueError:
+        pass
+
+    if payload.is_data_available():
+        properties = unpack_properties(
+            'DISCONNECT',
+            [
+                PropertyIds.SESSION_EXPIRY_INTERVAL,
+                PropertyIds.SERVER_REFERENCE,
+                PropertyIds.REASON_STRING,
+                PropertyIds.USER_PROPERTY
+            ],
+            payload)
+    else:
+        properties = {}
+
+    return reason, properties
+
+
 def pack_subscribe(topic, qos, packet_identifier):
     packed_topic = pack_string(topic)
     packed = pack_fixed_header(ControlPacketType.SUBSCRIBE,
@@ -1376,6 +1403,20 @@ class Client(object):
     def on_pingresp(self):
         self._pingresp_event.set()
 
+    def on_disconnect(self, payload):
+        try:
+            reason, properties = unpack_disconnect(payload)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed DISCONNECT packet.')
+            return
+
+        if reason != DisconnectReasonCode.NORMAL_DISCONNECTION:
+            LOGGER.info("Abnormal disconnect reason %s.", reason)
+
+        if PropertyIds.REASON_STRING in properties:
+            reason_string = properties[PropertyIds.REASON_STRING]
+            LOGGER.info("Disconnect reason string '%s'.", reason_string)
+
     async def reader_loop(self):
         while True:
             packet_type, flags, payload = await self._read_packet()
@@ -1398,6 +1439,8 @@ class Client(object):
                 self.on_unsuback(payload)
             elif packet_type == ControlPacketType.PINGRESP:
                 self.on_pingresp()
+            elif packet_type == ControlPacketType.DISCONNECT:
+                self.on_disconnect()
             else:
                 LOGGER.warning("Unsupported packet type %s with data %s.",
                                control_packet_type_to_string(packet_type),
