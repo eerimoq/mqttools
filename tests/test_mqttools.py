@@ -150,6 +150,30 @@ class MQTToolsTest(unittest.TestCase):
         self.assertEqual(message, b'c')
         self.run_until_complete(client.stop())
 
+    def test_unsubscribe(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # SUBSCRIBE
+            ('c2s', b'\x82\n\x00\x01\x00\x00\x04/a/b\x00'),
+            # SUBACK
+            ('s2c', b'\x90\x04\x00\x01\x00\x00'),
+            # UNSUBSCRIBE
+            ('c2s', b'\xa2\x09\x00\x02\x00\x00\x04/a/b'),
+            # UNSUBACK
+            ('s2c', b'\xb0\x04\x00\x02\x00\x00'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address, 'bar')
+        self.run_until_complete(client.start())
+        self.run_until_complete(client.subscribe('/a/b', 0))
+        self.run_until_complete(client.unsubscribe('/a/b'))
+        self.run_until_complete(client.stop())
+
     def test_publish_qos_0(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT

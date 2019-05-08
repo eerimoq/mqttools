@@ -561,6 +561,29 @@ def unpack_suback(payload):
     return packet_identifier, properties
 
 
+def pack_unsubscribe(topic, packet_identifier):
+    packed_topic = pack_string(topic)
+    packed = pack_fixed_header(ControlPacketType.UNSUBSCRIBE,
+                               2,
+                               len(packed_topic) + 3)
+    packed += struct.pack('>HB', packet_identifier, 0)
+    packed += packed_topic
+
+    return packed
+
+
+def unpack_unsuback(payload):
+    packet_identifier = unpack_u16(payload)
+    properties = unpack_properties('UNSUBACK',
+                                   [
+                                       PropertyIds.REASON_STRING,
+                                       PropertyIds.USER_PROPERTY
+                                   ],
+                                   payload)
+
+    return packet_identifier, properties
+
+
 def pack_publish(topic, message, qos, packet_identifier, alias):
     if alias is None:
         properties = b'\x00'
@@ -1091,6 +1114,18 @@ class Client(object):
                                               transaction.packet_identifier))
             await transaction.wait_until_completed()
 
+    async def unsubscribe(self, topic):
+        """Unsubscribe from given topic.
+
+        >>> await client.unsubscribe('/my/topic')
+
+        """
+
+        with Transaction(self) as transaction:
+            self._write_packet(pack_unsubscribe(topic,
+                                                transaction.packet_identifier))
+            await transaction.wait_until_completed()
+
     def publish_qos_0(self, topic, alias, message):
         with Transaction(self) as transaction:
             self._write_packet(pack_publish(topic,
@@ -1308,6 +1343,20 @@ class Client(object):
                 'Discarding unexpected SUBACK packet with identifier %d.',
                 packet_identifier)
 
+    def on_unsuback(self, payload):
+        try:
+            packet_identifier, properties = unpack_unsuback(payload)
+        except MalformedPacketError:
+            LOGGER.debug('Discarding malformed UNSUBACK packet.')
+            return
+
+        if packet_identifier in self.transactions:
+            self.transactions[packet_identifier].set_completed(None)
+        else:
+            LOGGER.debug(
+                'Discarding unexpected UNSUBACK packet with identifier %d.',
+                packet_identifier)
+
     def on_pingresp(self):
         self._pingresp_event.set()
 
@@ -1329,6 +1378,8 @@ class Client(object):
                 self.on_pubcomp(payload)
             elif packet_type == ControlPacketType.SUBACK:
                 self.on_suback(payload)
+            elif packet_type == ControlPacketType.UNSUBACK:
+                self.on_unsuback(payload)
             elif packet_type == ControlPacketType.PINGRESP:
                 self.on_pingresp()
             else:
