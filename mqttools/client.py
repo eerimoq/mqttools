@@ -309,7 +309,19 @@ def pack_property(property_id, value):
     }[property_id](value)
 
 
-def pack_properties(properties):
+def log_properties(packet_name, properties):
+    if LOGGER.isEnabledFor(logging.DEBUG):
+        LOGGER.debug('%s properties:', packet_name)
+
+        for identifier, value in properties.items():
+            LOGGER.debug('  %s(%d): %s',
+                         identifier.name,
+                         identifier.value,
+                         value)
+
+
+def pack_properties(packet_name, properties):
+    log_properties(packet_name, properties)
     packed = b''
 
     for property_id, value in properties.items():
@@ -353,7 +365,7 @@ def unpack_property(property_id, payload):
 def unpack_properties(packet_name,
                       allowed_property_ids,
                       payload):
-    """Return a dictionary of unpacked properties, or None on failure.
+    """Return a dictionary of unpacked properties.
 
     """
 
@@ -371,14 +383,7 @@ def unpack_properties(packet_name,
         property_id = PropertyIds(property_id)
         properties[property_id] = unpack_property(property_id, payload)
 
-    # Log the properties.
-    LOGGER.debug('%s properties:', packet_name)
-
-    for identifier, value in properties.items():
-        LOGGER.debug('  %s(%d): %s',
-                     identifier.name,
-                     identifier.value,
-                     value)
+    log_properties(packet_name, properties)
 
     return properties
 
@@ -449,7 +454,8 @@ def pack_connect(client_id,
                  will_topic,
                  will_message,
                  will_qos,
-                 keep_alive_s):
+                 keep_alive_s,
+                 properties):
     flags = CLEAN_START
     payload_length = len(client_id) + 2
 
@@ -466,16 +472,17 @@ def pack_connect(client_id,
         payload_length += len(packed_will_topic)
         payload_length += len(will_message) + 2
 
+    properties = pack_properties('CONNECT', properties)
     packed = pack_fixed_header(ControlPacketType.CONNECT,
                                0,
-                               10 + payload_length + 1)
+                               10 + payload_length + len(properties))
     packed += struct.pack('>H', 4)
     packed += b'MQTT'
-    packed += struct.pack('>BBHB',
+    packed += struct.pack('>BBH',
                           PROTOCOL_VERSION,
                           flags,
-                          keep_alive_s,
-                          0)
+                          keep_alive_s)
+    packed += properties
     packed += pack_string(client_id)
 
     if flags & WILL_FLAG:
@@ -558,7 +565,8 @@ def pack_publish(topic, message, qos, packet_identifier, alias):
     if alias is None:
         properties = b'\x00'
     else:
-        properties = pack_properties({PropertyIds.TOPIC_ALIAS: alias})
+        properties = pack_properties('PUBLISH',
+                                     {PropertyIds.TOPIC_ALIAS: alias})
 
     packed_topic = pack_string(topic)
     size = len(packed_topic) + len(message) + len(properties)
@@ -602,7 +610,7 @@ def unpack_publish(payload, qos):
 
     message = payload.read_all()
 
-    return packet_identifier, topic, message
+    return packet_identifier, topic, message, properties
 
 
 def pack_puback(packet_identifier, reason):
@@ -809,7 +817,46 @@ class Transaction(object):
 
 
 class Client(object):
-    """An MQTT client.
+    """An MQTT 5.0 client.
+
+    `host` and `port` are the host and port of the broker.
+
+    `client_id` is the client id string. If ``None``, it is created on
+    the form ``mqttools-<UUID[0..14]>``.
+
+    `will_topic`, `will_message` and `will_qos` are used to ask the
+    broker to send a will when the session ends.
+
+    `keep_alive_s` is the keep alive time in seconds.
+
+    `response_timeout` is the maximum time to wait for a response from
+    the broker.
+
+    `topic_aliases` is a list of topics that should be published with
+    aliases instead of the topic string.
+
+    `topic_alias_maximum` is the maximum number of topic aliases the
+    client is willing to assign on request from the broker.
+
+    `kwargs` are passed to `asyncio.open_connection()`.
+
+    Create a client with default configuration:
+
+    >>> client = Client('broker.hivemq.com', 1883)
+
+    Create a client with using all optional arguments:
+
+    >>> client = Client('broker.hivemq.com',
+                        1883,
+                        client_id='my-client',
+                        will_topic='/my/last/will',
+                        will_message=b'my-last-message',
+                        will_qos=1,
+                        keep_alive_s=600,
+                        response_timeout=30',
+                        topic_aliases=['/my/topic']',
+                        topic_alias_maximum=100,
+                        ssl=True)
 
     """
 
@@ -823,6 +870,7 @@ class Client(object):
                  keep_alive_s=0,
                  response_timeout=5,
                  topic_aliases=None,
+                 topic_alias_maximum=0,
                  **kwargs):
         self._host = host
         self._port = port
@@ -837,15 +885,24 @@ class Client(object):
         self._keep_alive_s = keep_alive_s
         self._kwargs = kwargs
         self.response_timeout = response_timeout
+        self._connect_properties = {}
+        self._topic_alias_maximum = topic_alias_maximum
+        self._topic_aliases = None
+
+        if topic_alias_maximum > 0:
+            self._connect_properties[PropertyIds.TOPIC_ALIAS_MAXIMUM] = (
+                topic_alias_maximum)
 
         if topic_aliases is None:
             topic_aliases = []
 
-        self._topic_aliases = None
-        self._topic_aliases_init = {
+        self._broker_topic_aliases = None
+        self._broker_topic_aliases_init = {
             topic: alias
             for alias, topic in enumerate(topic_aliases, 1)
         }
+        self._broker_topic_alias_maximum = None
+        self._registered_broker_topic_aliases = None
         self._reader = None
         self._writer = None
         self._reader_task = None
@@ -856,10 +913,8 @@ class Client(object):
         self.messages = None
         self._connack = None
         self._next_packet_identifier = None
-        self._receive_maximum = None
-        self._receive_maximum_semaphore = None
-        self._topic_alias_maximum = None
-        self._registered_topic_aliases = None
+        self._broker_receive_maximum = None
+        self._broker_receive_maximum_semaphore = None
         self._on_publish_qos_2_transactions = None
 
         if keep_alive_s == 0:
@@ -869,28 +924,41 @@ class Client(object):
 
     @property
     def client_id(self):
+        """The client identifier string.
+
+        """
+
         return self._client_id
 
     @property
-    def receive_maximum(self):
-        return self._receive_maximum
+    def broker_receive_maximum(self):
+        """The maximum number of QoS 1 and QoS 2 publications the broker is
+        willing to process concurrently.
+
+        """
+
+        return self._broker_receive_maximum
 
     async def start(self):
-        """Start the connection to the broker.
+        """Open a TCP connection to the broker and perform the MQTT connect
+        procedure.
+
+        >>> await client.start()
 
         """
 
         self._topic_aliases = {}
+        self._broker_topic_aliases = {}
+        self._broker_topic_alias_maximum = 0
+        self._registered_broker_topic_aliases = set()
         self._connack_event = asyncio.Event()
         self._pingresp_event = asyncio.Event()
         self.transactions = {}
         self.messages = asyncio.Queue()
         self._connack = None
         self._next_packet_identifier = 1
-        self._receive_maximum = None
-        self._receive_maximum_semaphore = None
-        self._topic_alias_maximum = None
-        self._registered_topic_aliases = set()
+        self._broker_receive_maximum = None
+        self._broker_receive_maximum_semaphore = None
         self._on_publish_qos_2_transactions = {}
         self._reader, self._writer = await asyncio.open_connection(
             self._host,
@@ -906,7 +974,10 @@ class Client(object):
         await self.connect()
 
     async def stop(self):
-        """Stop the connection to the broker.
+        """Try to cleanly disconnect from the broker and then close the TCP
+        connection.
+
+        >>> await client.stop()
 
         """
 
@@ -938,7 +1009,8 @@ class Client(object):
                                         self._will_topic,
                                         self._will_message,
                                         self._will_qos,
-                                        self._keep_alive_s))
+                                        self._keep_alive_s,
+                                        self._connect_properties))
 
         try:
             await asyncio.wait_for(self._connack_event.wait(),
@@ -953,34 +1025,40 @@ class Client(object):
 
         # Receive maximum.
         if PropertyIds.RECEIVE_MAXIMUM in properties:
-            self._receive_maximum = properties[PropertyIds.RECEIVE_MAXIMUM]
+            self._broker_receive_maximum = properties[PropertyIds.RECEIVE_MAXIMUM]
         else:
-            self._receive_maximum = 65535
+            self._broker_receive_maximum = 65535
 
-        self._receive_maximum_semaphore = asyncio.Semaphore(self._receive_maximum)
+        self._broker_receive_maximum_semaphore = (
+            asyncio.Semaphore(self._broker_receive_maximum))
 
         # Topic alias maximum.
         if PropertyIds.TOPIC_ALIAS_MAXIMUM in properties:
-            self._topic_alias_maximum = properties[PropertyIds.TOPIC_ALIAS_MAXIMUM]
+            self._broker_topic_alias_maximum = (
+                properties[PropertyIds.TOPIC_ALIAS_MAXIMUM])
         else:
-            self._topic_alias_maximum = 0
+            self._broker_topic_alias_maximum = 0
 
-        if len(self._topic_aliases_init) > self._topic_alias_maximum:
+        if len(self._broker_topic_aliases_init) > self._broker_topic_alias_maximum:
             LOGGER.warning('The broker topic alias maximum is %d, which is lower '
                            'than the topic aliases length %d.',
-                           self._topic_alias_maximum,
-                           len(self._topic_aliases_init))
+                           self._broker_topic_alias_maximum,
+                           len(self._broker_topic_aliases_init))
 
-        self._topic_aliases = {
+        self._broker_topic_aliases = {
             topic: alias
-            for topic, alias in self._topic_aliases_init.items()
-            if alias < self._topic_alias_maximum + 1
+            for topic, alias in self._broker_topic_aliases_init.items()
+            if alias < self._broker_topic_alias_maximum + 1
         }
 
     def disconnect(self):
         self._write_packet(pack_disconnect())
 
     async def subscribe(self, topic, qos):
+        """Subscribe to given topic with given QoS.
+
+        """
+
         with Transaction(self) as transaction:
             self._write_packet(pack_subscribe(topic,
                                               qos,
@@ -996,7 +1074,7 @@ class Client(object):
                                             alias))
 
     async def publish_qos_1(self, topic, alias, message):
-        async with self._receive_maximum_semaphore:
+        async with self._broker_receive_maximum_semaphore:
             with Transaction(self) as transaction:
                 self._write_packet(pack_publish(topic,
                                                 message,
@@ -1013,7 +1091,7 @@ class Client(object):
                         raise PublishError(reason)
 
     async def publish_qos_2(self, topic, alias, message):
-        async with self._receive_maximum_semaphore:
+        async with self._broker_receive_maximum_semaphore:
             with Transaction(self) as transaction:
                 self._write_packet(pack_publish(topic,
                                                 message,
@@ -1037,10 +1115,14 @@ class Client(object):
                     raise PublishError(reason)
 
     async def publish(self, topic, message, qos):
-        if topic in self._topic_aliases:
-            alias = self._topic_aliases[topic]
+        """Publish given message to given topic with given QoS.
 
-            if alias in self._registered_topic_aliases:
+        """
+
+        if topic in self._broker_topic_aliases:
+            alias = self._broker_topic_aliases[topic]
+
+            if alias in self._registered_broker_topic_aliases:
                 topic = ''
         else:
             alias = None
@@ -1055,7 +1137,7 @@ class Client(object):
             raise Error(f'Invalid QoS {qos}.')
 
         if (alias is not None) and (topic != ''):
-            self._registered_topic_aliases.add(alias)
+            self._registered_broker_topic_aliases.add(alias)
 
     def on_connack(self, payload):
         self._connack = unpack_connack(payload)
@@ -1076,10 +1158,30 @@ class Client(object):
         qos = ((flags >> 1) & 0x3)
 
         try:
-            packet_identifier, topic, message = unpack_publish(payload, qos)
+            packet_identifier, topic, message, properties = unpack_publish(
+                payload,
+                qos)
         except MalformedPacketError:
             LOGGER.debug('Discarding malformed PUBLISH packet.')
             return
+
+        if PropertyIds.TOPIC_ALIAS in properties:
+            alias = properties[PropertyIds.TOPIC_ALIAS]
+
+            if topic == '':
+                try:
+                    topic = self._topic_aliases[alias]
+                except KeyError:
+                    LOGGER.debug(
+                        'Invalid topic alias %d received from the broker.',
+                        alias)
+                    return
+            elif 0 < alias <= self._topic_alias_maximum:
+                self._topic_aliases[alias] = topic
+            else:
+                LOGGER.debug('Invalid topic alias %d received from the broker.',
+                             alias)
+                return
 
         if qos == 0:
             await self.messages.put((topic, message))

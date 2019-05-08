@@ -5,7 +5,11 @@ from . import try_decode
 
 
 async def subscriber(host, port, client_id, topic, qos, keep_alive_s):
-    client = Client(host, port, client_id, keep_alive_s=keep_alive_s)
+    client = Client(host,
+                    port,
+                    client_id,
+                    keep_alive_s=keep_alive_s,
+                    topic_alias_maximum=10)
 
     await client.start()
     await client.subscribe(topic, qos)

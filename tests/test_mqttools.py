@@ -469,7 +469,7 @@ class MQTToolsTest(unittest.TestCase):
         self.assertIn('Published 1 message(s) in', stdout.getvalue())
         self.assertIn('from 10 concurrent task(s).', stdout.getvalue())
 
-    def test_topic_alias(self):
+    def test_publish_topic_alias(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
             ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
@@ -510,7 +510,7 @@ class MQTToolsTest(unittest.TestCase):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
             ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
-            # CONNACK with topic alias 5
+            # CONNACK with topic alias 1
             ('s2c', b'\x20\x06\x00\x00\x03\x22\x00\x01'),
             # PUBLISH to set alias
             ('c2s', b'\x30\x0d\x00\x04/foo\x03\x23\x00\x01apa'),
@@ -544,6 +544,44 @@ class MQTToolsTest(unittest.TestCase):
             self.run_until_complete(client.start())
 
         self.assertEqual(str(cm.exception), 'UNSPECIFIED_ERROR(128)')
+
+    def test_receive_topic_alias(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT with topic alias 5
+            (
+                'c2s',
+                b'\x10\x13\x00\x04MQTT\x05\x02\x00\x00\x03\x22\x00\x05\x00\x03bar'
+            ),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # SUBSCRIBE
+            ('c2s', b'\x82\x18\x00\x01\x00\x00\x12/test/mqttools/foo\x00'),
+            # SUBACK
+            ('s2c', b'\x90\x04\x00\x01\x00\x00'),
+            # PUBLISH to set alias
+            (
+                's2c',
+                b'\x30\x2c\x00\x12/test/mqttools/foo\x03\x23\x00\x01'
+                b'sets-alias-in-client'
+            ),
+            # PUBLISH using alias
+            ('s2c', b'\x30\x1a\x00\x00\x03\x23\x00\x01published-with-alias'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 topic_alias_maximum=5)
+        self.run_until_complete(client.start())
+        self.run_until_complete(client.subscribe('/test/mqttools/foo', 0))
+        topic, message = self.run_until_complete(client.messages.get())
+        self.assertEqual(topic, '/test/mqttools/foo')
+        self.assertEqual(message, b'sets-alias-in-client')
+        topic, message = self.run_until_complete(client.messages.get())
+        self.assertEqual(topic, '/test/mqttools/foo')
+        self.assertEqual(message, b'published-with-alias')
+        self.run_until_complete(client.stop())
 
 
 logging.basicConfig(level=logging.DEBUG)

@@ -65,7 +65,7 @@ async def publisher(host, port, client_id, qos, count, size, topic, message):
             await client.publish(topic, message_bytes, qos)
     else:
         counter = Counter(count)
-        number_of_concurrent_tasks = client.receive_maximum
+        number_of_concurrent_tasks = client.broker_receive_maximum
         await asyncio.gather(*[
             asyncio.create_task(
                 worker(client, counter, qos, size, topic, message, fmt))

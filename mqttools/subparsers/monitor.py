@@ -31,7 +31,8 @@ class ClientThread(threading.Thread):
         client = Client(self._host,
                         self._port,
                         self._client_id,
-                        keep_alive_s=self._keep_alive_s)
+                        keep_alive_s=self._keep_alive_s,
+                        topic_alias_maximum=10)
 
         await client.start()
         await asyncio.gather(*[client.subscribe(topic, 0)
