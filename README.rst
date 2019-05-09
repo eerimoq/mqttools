@@ -18,7 +18,7 @@ Client features:
 
 - Topic aliases for smaller publish packets.
 
-- Monitor, subscribe and publish command line commands.
+- ``monitor``, ``subscribe`` and ``publish`` command line commands.
 
 Broker features:
 
@@ -28,7 +28,7 @@ Broker features:
 - Session resume (or clean start support) for less initial
   communication. Session state storage in RAM.
 
-- Broker command line command.
+- ``broker`` command line command.
 
 QoS level 1 and 2 messages are not yet supprted. A session state
 storage is required to do so, both in the client and the broker.
