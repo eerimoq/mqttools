@@ -664,7 +664,7 @@ def unpack_unsubscribe(payload):
 
 
 def pack_unsuback(packet_identifier):
-    packed = pack_fixed_header(ControlPacketType.UNSUBSCRIBE, 0, 3)
+    packed = pack_fixed_header(ControlPacketType.UNSUBACK, 0, 3)
     packed += pack_u16(packet_identifier)
     packed += pack_properties('UNSUBACK', {})
 

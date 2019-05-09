@@ -141,7 +141,7 @@ class Client(object):
         self._write_packet(pack_suback(packet_identifier))
 
     def on_unsubscribe(self, payload):
-        topic, packet_identifier = unpack_unsubscribe(payload)
+        packet_identifier, topic = unpack_unsubscribe(payload)
         validate_topic(topic)
         self._session.subscribes.remove(topic)
         self._broker.remove_subscriber(topic, self._session)
