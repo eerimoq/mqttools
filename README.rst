@@ -6,11 +6,12 @@ MQTT Tools
 
 MQTT tools in Python 3.7 and later.
 
-Features:
+Both the client and the broker implments MQTT version 5.0 using
+``asyncio``.
 
-- MQTT 5.0 client using ``asyncio``.
+Client features:
 
-- Subscribe to and publish QoS level 0 messages.
+- Subscribe to and publish QoS level 0 topics.
 
 - Broker session resume (or clean start support) for less initial
   communication.
@@ -19,10 +20,20 @@ Features:
 
 - Monitor, subscribe and publish command line commands.
 
-QoS level 1 and 2 messages are not yet supprted. A client side session
-state storage is required to do so.
+Broker features:
 
-MQTT 5.0 specification:
+- Subscribe to and publish QoS level 0 topics. Wildcards (# and +) are
+  not supported.
+
+- Session resume (or clean start support) for less initial
+  communication. Session state storage in RAM.
+
+- Broker command line command.
+
+QoS level 1 and 2 messages are not yet supprted. A session state
+storage is required to do so, both in the client and the broker.
+
+MQTT version 5.0 specification:
 https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
 
 Project homepage: https://github.com/eerimoq/mqttools

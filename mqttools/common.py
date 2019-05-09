@@ -486,10 +486,10 @@ def unpack_connect(payload):
     unpack_u16(payload)
 
     if payload.read(4) != b'MQTT':
-        raise MalformedPacketError()
+        raise MalformedPacketError('Invalid MQTT magic string.')
 
     if unpack_u8(payload) != PROTOCOL_VERSION:
-        raise MalformedPacketError()
+        raise MalformedPacketError('Wrong protocol version.')
 
     flags = unpack_u8(payload)
     clean_start = bool(flags & CLEAN_START)

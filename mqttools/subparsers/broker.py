@@ -9,6 +9,7 @@ from ..broker import Broker
 
 
 def _do_broker(args):
+    print(f"Starting a broker at '{args.host}:{args.port}'.")
     broker = Broker(args.host, args.port)
     asyncio.run(broker.run())
 

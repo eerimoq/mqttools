@@ -95,7 +95,7 @@ class Transaction(object):
 
 
 class Client(object):
-    """An MQTT 5.0 client.
+    """An MQTT version 5.0 client.
 
     `host` and `port` are the host and port of the broker.
 

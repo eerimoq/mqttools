@@ -3,10 +3,10 @@ import bitstruct
 import logging
 import binascii
 from collections import defaultdict
-import enum
 
 from .common import ControlPacketType
 from .common import DisconnectReasonCode
+from .common import PropertyIds
 from .common import MalformedPacketError
 from .common import PayloadReader
 from .common import control_packet_type_to_string
@@ -30,10 +30,19 @@ class Session(object):
     def __init__(self):
         self.subscribes = set()
         self.expiry_time = None
+        self.client = None
 
     def clean(self):
         self.subscribes = set()
         self.expiry_time = None
+        self.client = None
+
+
+def validate_topic(topic):
+    if '#' in topic or '+' in topic:
+        raise MalformedPacketError(
+            '# and + are not supported in topic patterns.')
+
 
 class Client(object):
 
@@ -64,6 +73,9 @@ class Client(object):
 
             if isinstance(e, MalformedPacketError):
                 self._disconnect_reason = DisconnectReasonCode.MALFORMED_PACKET
+
+        if self._session is not None:
+            self._session.client = None
 
         LOGGER.info('Closing client %r.', addr)
 
@@ -111,22 +123,30 @@ class Client(object):
         self._session, session_present = self._broker.get_session(
             client_id,
             clean_start)
-        self._write_packet(pack_connack(session_present, 0, {}))
+        self._session.client = self
+        self._write_packet(pack_connack(session_present,
+                                        0,
+                                        {PropertyIds.MAXIMUM_QOS: 0}))
+
+        LOGGER.info("Client '%s' connected.", client_id)
 
     def on_publish(self, payload):
         topic, message, _ = unpack_publish(payload, 0)
+        validate_topic(topic)
 
-        for client in self._broker.iter_subscribers(topic):
-            client.publish(topic, message)
+        for session in self._broker.iter_subscribers(topic):
+            session.client.publish(topic, message)
 
     def on_subscribe(self, payload):
         topic, packet_identifier = unpack_subscribe(payload)
+        validate_topic(topic)
         self._session.subscribes.add(topic)
         self._broker.add_subscriber(topic, self._session)
         self._write_packet(pack_suback(packet_identifier))
 
     def on_unsubscribe(self, payload):
         topic, packet_identifier = unpack_unsubscribe(payload)
+        validate_topic(topic)
         self._session.subscribes.remove(topic)
         self._broker.remove_subscriber(topic, self._session)
         self._write_packet(pack_unsuback(packet_identifier))
@@ -150,7 +170,7 @@ class Client(object):
 
 
 class Broker(object):
-    """An MQTT 5.0 broker.
+    """A limited MQTT version 5.0 broker.
 
     `host` and `port` are the host and port to listen for clients on.
 
@@ -163,7 +183,7 @@ class Broker(object):
         self._subscribers = defaultdict(list)
 
     async def run(self):
-        listener = await asyncio.start_server(self.serve_client,
+        listener = await asyncio.start_server(self._serve_client,
                                               self._host,
                                               self._port)
         listener_address = listener.sockets[0].getsockname()
@@ -173,7 +193,7 @@ class Broker(object):
         async with listener:
             await listener.serve_forever()
 
-    async def serve_client(self, reader, writer):
+    async def _serve_client(self, reader, writer):
         client = Client(self, reader, writer)
         await client.serve_forever()
 
@@ -190,13 +210,9 @@ class Broker(object):
             del topic_sessions[topic_sessions.index(session)]
 
     def iter_subscribers(self, topic):
-        topic_sessions = self._subscribers[topic]
-
-        if session in topic_sessions:
-            if topic in session.subscribes:
+        for session in self._subscribers[topic]:
+            if session.client is not None:
                 yield session
-            else:
-                del topic_sessions[topic_sessions.index(session)]
 
     def get_session(self, client_id, clean_start):
         session_present = False
@@ -210,6 +226,10 @@ class Broker(object):
 
                 session.clean()
             else:
+                LOGGER.info(
+                    "Session resumed for client '%s' with %d subscribes.",
+                    client_id,
+                    len(session.subscribes))
                 session_present = True
         else:
             session = Session()

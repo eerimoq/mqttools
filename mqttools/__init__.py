@@ -15,6 +15,11 @@ def main():
     parser = argparse.ArgumentParser(description='MQTT Tools.')
 
     parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument('-l', '--log-level',
+                        choices=[
+                            'debug', 'info', 'warning', 'error', 'critical'
+                        ],
+                        help='Set the logging level.')
     parser.add_argument('--version',
                         action='version',
                         version=__version__,
@@ -39,8 +44,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
+    if args.log_level:
+        level = logging.getLevelName(args.log_level.upper())
+        logging.basicConfig(level=level)
 
     if args.debug:
         args.func(args)
