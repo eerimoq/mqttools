@@ -101,11 +101,7 @@ class BrokerTest(unittest.TestCase):
             writer_1.write(connect)
             connack = await reader_1.readexactly(7)
             self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
-            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
-            writer_1.write(subscribe)
-            suback = await reader_1.readexactly(5)
-            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
-            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/c\x00'
+            subscribe = b'\x82\x11\x00\x01\x00\x00\x04/a/b\x00\x00\x04/a/c\x00'
             writer_1.write(subscribe)
             suback = await reader_1.readexactly(5)
             self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
@@ -221,6 +217,37 @@ class BrokerTest(unittest.TestCase):
 
             writer_1.close()
             writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_ping(self):
+        asyncio.run(self.ping())
+
+    async def ping(self):
+        broker = mqttools.Broker('localhost', 0)
+
+        async def broker_wrapper():
+            with self.assertRaises(asyncio.CancelledError):
+                await broker.run()
+
+        broker_task = asyncio.create_task(broker_wrapper())
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the pinger.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(7)
+            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            pingreq = b'\xc0\x00'
+            writer_1.write(pingreq)
+            pingresp = await reader_1.readexactly(2)
+            self.assertEqual(pingresp, b'\xd0\x00')
+
+            writer_1.close()
             broker_task.cancel()
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)

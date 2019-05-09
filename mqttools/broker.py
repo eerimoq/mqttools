@@ -19,6 +19,7 @@ from .common import unpack_subscribe
 from .common import pack_suback
 from .common import unpack_unsubscribe
 from .common import pack_unsuback
+from .common import pack_pingresp
 from .common import unpack_disconnect
 
 
@@ -85,6 +86,8 @@ class Client(object):
                 self.on_subscribe(payload)
             elif packet_type == ControlPacketType.UNSUBSCRIBE:
                 self.on_unsubscribe(payload)
+            elif packet_type == ControlPacketType.PINGREQ:
+                self.on_pingreq()
             elif packet_type == ControlPacketType.DISCONNECT:
                 self.on_disconnect(payload)
             else:
@@ -134,10 +137,15 @@ class Client(object):
             session.client.publish(topic, message)
 
     def on_subscribe(self, payload):
-        topic, packet_identifier = unpack_subscribe(payload)
-        validate_topic(topic)
-        self._session.subscribes.add(topic)
-        self._broker.add_subscriber(topic, self._session)
+        topics, packet_identifier = unpack_subscribe(payload)
+
+        for topic in topics:
+            validate_topic(topic)
+
+        for topic in topics:
+            self._session.subscribes.add(topic)
+            self._broker.add_subscriber(topic, self._session)
+
         self._write_packet(pack_suback(packet_identifier))
 
     def on_unsubscribe(self, payload):
@@ -146,6 +154,9 @@ class Client(object):
         self._session.subscribes.remove(topic)
         self._broker.remove_subscriber(topic, self._session)
         self._write_packet(pack_unsuback(packet_identifier))
+
+    def on_pingreq(self):
+        self._write_packet(pack_pingresp())
 
     def on_disconnect(self, payload):
         unpack_disconnect(payload)

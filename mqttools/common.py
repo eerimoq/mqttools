@@ -616,9 +616,13 @@ def pack_subscribe(topic, packet_identifier):
 def unpack_subscribe(payload):
     packet_identifier = unpack_u16(payload)
     unpack_u8(payload)
-    topic = unpack_string(payload)
+    topics = []
 
-    return topic, packet_identifier
+    while payload.is_data_available():
+        topics.append(unpack_string(payload))
+        unpack_u8(payload)
+
+    return topics, packet_identifier
 
 
 def pack_suback(packet_identifier):
@@ -727,3 +731,7 @@ def unpack_publish(payload, qos):
 
 def pack_pingreq():
     return pack_fixed_header(ControlPacketType.PINGREQ, 0, 0)
+
+
+def pack_pingresp():
+    return pack_fixed_header(ControlPacketType.PINGRESP, 0, 0)
