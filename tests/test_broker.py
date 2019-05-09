@@ -1,0 +1,74 @@
+import logging
+import asyncio
+import unittest
+
+import mqttools
+
+
+class BrokerTest(unittest.TestCase):
+
+    def test_publish_to_two_subscribers(self):
+        asyncio.run(self.publish_to_two_subscribers())
+
+    async def publish_to_two_subscribers(self):
+        broker = mqttools.Broker('localhost', 0)
+
+        async def broker_wrapper():
+            with self.assertRaises(asyncio.CancelledError):
+                await broker.run()
+
+        broker_task = asyncio.create_task(broker_wrapper())
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup subscriber 1.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(7)
+            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(5)
+            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
+
+            # Setup subscriber 2.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su2'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(7)
+            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
+            writer_2.write(subscribe)
+            suback = await reader_2.readexactly(5)
+            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
+
+            # Setup a publisher.
+            reader_3, writer_3 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_3.write(connect)
+            connack = await reader_3.readexactly(7)
+            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            publish = b'\x30\x0a\x00\x04/a/b\x00apa'
+            writer_3.write(publish)
+
+            # Receive the publish in both subscribers.
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/b\x00apa')
+            publish = await reader_2.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/b\x00apa')
+
+            writer_1.close()
+            writer_2.close()
+            writer_3.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+
+logging.basicConfig(level=logging.DEBUG)
+
+
+if __name__ == '__main__':
+    unittest.main()

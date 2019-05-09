@@ -177,19 +177,27 @@ class Broker(object):
         self._port = port
         self._sessions = {}
         self._subscribers = defaultdict(list)
+        self._listener = None
+        self._listener_ready = asyncio.Event()
+
+    async def getsockname(self):
+        await self._listener_ready.wait()
+
+        return self._listener.sockets[0].getsockname()
 
     async def run(self):
-        listener = await asyncio.start_server(self._serve_client,
-                                              self._host,
-                                              self._port)
-        listener_address = listener.sockets[0].getsockname()
+        self._listener = await asyncio.start_server(self.serve_client,
+                                                    self._host,
+                                                    self._port)
+        self._listener_ready.set()
+        listener_address = self._listener.sockets[0].getsockname()
 
         LOGGER.info(f'Listening for clients on {listener_address}.')
 
-        async with listener:
-            await listener.serve_forever()
+        async with self._listener:
+            await self._listener.serve_forever()
 
-    async def _serve_client(self, reader, writer):
+    async def serve_client(self, reader, writer):
         client = Client(self, reader, writer)
         await client.serve_forever()
 

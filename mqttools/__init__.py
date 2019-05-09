@@ -9,6 +9,7 @@ from .client import ConnectError
 from .client import SessionResumeError
 from .client import PublishError
 from .client import QoS
+from .broker import Broker
 
 
 def main():
