@@ -16,10 +16,11 @@ def main():
 
     parser.add_argument('-d', '--debug', action='store_true')
     parser.add_argument('-l', '--log-level',
+                        default='error',
                         choices=[
                             'debug', 'info', 'warning', 'error', 'critical'
                         ],
-                        help='Set the logging level.')
+                        help='Set the logging level (default: %(default)s).')
     parser.add_argument('--version',
                         action='version',
                         version=__version__,
@@ -44,9 +45,8 @@ def main():
 
     args = parser.parse_args()
 
-    if args.log_level:
-        level = logging.getLevelName(args.log_level.upper())
-        logging.basicConfig(level=level)
+    level = logging.getLevelName(args.log_level.upper())
+    logging.basicConfig(level=level)
 
     if args.debug:
         args.func(args)

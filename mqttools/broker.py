@@ -50,7 +50,6 @@ class Client(object):
         self._broker = broker
         self._reader = reader
         self._writer = writer
-        self._disconnect_reason = DisconnectReasonCode.NORMAL_DISCONNECTION
         self._session = None
 
     async def serve_forever(self):
@@ -70,9 +69,6 @@ class Client(object):
             await self.reader_loop()
         except Exception as e:
             LOGGER.debug('Reader task stopped by %r.', e)
-
-            if isinstance(e, MalformedPacketError):
-                self._disconnect_reason = DisconnectReasonCode.MALFORMED_PACKET
 
         if self._session is not None:
             self._session.client = None
