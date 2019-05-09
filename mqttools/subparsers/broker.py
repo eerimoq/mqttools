@@ -18,10 +18,10 @@ def add_subparser(subparsers):
     subparser = subparsers.add_parser('broker',
                                       description='A simple broker.')
     subparser.add_argument('--host',
-                           default='',
-                           help="Broker host (default: '').")
+                           default='localhost',
+                           help="Broker host (default: %(default)s).")
     subparser.add_argument('--port',
                            type=int,
                            default=1883,
-                           help='Broker port (default: 1883).')
+                           help='Broker port (default: %(default)s).')
     subparser.set_defaults(func=_do_broker)

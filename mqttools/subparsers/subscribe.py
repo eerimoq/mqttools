@@ -38,17 +38,18 @@ def add_subparser(subparsers):
                                       description='Subscribe for given topic.')
     subparser.add_argument('--host',
                            default='broker.hivemq.com',
-                           help='Broker host (default: broker.hivemq.com).')
+                           help='Broker host (default: %(default)s).')
     subparser.add_argument('--port',
                            type=int,
                            default=1883,
-                           help='Broker port (default: 1883).')
+                           help='Broker port (default: %(default)s).')
     subparser.add_argument('--client-id',
                            help='Client id (default: mqttools-<UUID[0..14]>).')
     subparser.add_argument('--keep-alive',
                            type=int,
                            default=0,
-                           help=('Keep alive time in seconds (default: 0). Give '
-                                 'as 0 to disable keep alive.'))
+                           help=('Keep alive time in seconds (default: '
+                                 '%(default)s). Give as 0 to disable keep '
+                                 'alive.'))
     subparser.add_argument('topic', help='Topic to subscribe for.')
     subparser.set_defaults(func=_do_subscribe)

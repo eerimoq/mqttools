@@ -53,23 +53,23 @@ def add_subparser(subparsers):
                                       description='Publish given topic.')
     subparser.add_argument('--host',
                            default='broker.hivemq.com',
-                           help='Broker host (default: broker.hivemq.com).')
+                           help='Broker host (default: %(default)s).')
     subparser.add_argument('--port',
                            type=int,
                            default=1883,
-                           help='Broker port (default: 1883).')
+                           help='Broker port (default: %(default)s).')
     subparser.add_argument('--client-id',
                            help='Client id (default: mqttools-<UUID[0..14]>).')
     subparser.add_argument(
         '--count',
         type=int,
         default=1,
-        help='Number of times to publish the message (default: 1).')
+        help='Number of times to publish the message (default: %(default)s).')
     subparser.add_argument(
         '--size',
         type=int,
         default=10,
-        help='Generated message size (default: 10).')
+        help='Generated message size (default: %(default)s).')
     subparser.add_argument('topic', help='Topic to publish.')
     subparser.add_argument(
         'message',

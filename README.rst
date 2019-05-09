@@ -103,6 +103,16 @@ The menu at the bottom of the monitor shows the available commands.
 
 - Play/Pause: Toggle between playing and paused (or running and freezed).
 
+Broker
+^^^^^^
+
+Start a broker to serve clients.
+
+.. code-block:: text
+
+   $ mqttools broker
+   Starting a broker at 'localhost:1883'.
+
 Scripting
 ---------
 
