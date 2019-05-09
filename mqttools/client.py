@@ -6,7 +6,6 @@ import binascii
 import uuid
 import bitstruct
 
-from .common import CLEAN_START
 from .common import ControlPacketType
 from .common import ConnectReasonCode
 from .common import PropertyIds

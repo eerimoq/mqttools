@@ -6,6 +6,16 @@ from io import BytesIO
 import bitstruct
 
 
+# Connection flags.
+CLEAN_START    = 0x02
+WILL_FLAG      = 0x04
+WILL_QOS_1     = 0x08
+WILL_QOS_2     = 0x10
+WILL_RETAIN    = 0x20
+PASSWORD_FLAG  = 0x40
+USER_NAME_FLAG = 0x80
+
+
 # Control packet types.
 class ControlPacketType(enum.IntEnum):
     CONNECT     = 1
@@ -22,16 +32,6 @@ class ControlPacketType(enum.IntEnum):
     PINGREQ     = 12
     PINGRESP    = 13
     DISCONNECT  = 14
-
-
-# Connection flags.
-CLEAN_START    = 0x02
-WILL_FLAG      = 0x04
-WILL_QOS_1     = 0x08
-WILL_QOS_2     = 0x10
-WILL_RETAIN    = 0x20
-PASSWORD_FLAG  = 0x40
-USER_NAME_FLAG = 0x80
 
 
 class ConnectReasonCode(enum.IntEnum):
@@ -62,36 +62,6 @@ class ConnectReasonCode(enum.IntEnum):
     USE_ANOTHER_SERVER                   = 156
     SERVER_MOVED                         = 157
     CONNECTION_RATE_EXCEEDED             = 159
-
-
-class PropertyIds(enum.IntEnum):
-    PAYLOAD_FORMAT_INDICATOR          = 1
-    MESSAGE_EXPIRY_INTERVAL           = 2
-    CONTENT_TYPE                      = 3
-    RESPONSE_TOPIC                    = 8
-    CORRELATION_DATA                  = 9
-    SUBSCRIPTION_IDENTIFIER           = 11
-    SESSION_EXPIRY_INTERVAL           = 17
-    ASSIGNED_CLIENT_IDENTIFIER        = 18
-    SERVER_KEEP_ALIVE                 = 19
-    AUTHENTICATION_METHOD             = 21
-    AUTHENTICATION_DATA               = 22
-    REQUEST_PROBLEM_INFORMATION       = 23
-    WILL_DELAY_INTERVAL               = 24
-    REQUEST_RESPONSE_INFORMATION      = 25
-    RESPONSE_INFORMATION              = 26
-    SERVER_REFERENCE                  = 28
-    REASON_STRING                     = 31
-    RECEIVE_MAXIMUM                   = 33
-    TOPIC_ALIAS_MAXIMUM               = 34
-    TOPIC_ALIAS                       = 35
-    MAXIMUM_QOS                       = 36
-    RETAIN_AVAILABLE                  = 37
-    USER_PROPERTY                     = 38
-    MAXIMUM_PACKET_SIZE               = 39
-    WILDCARD_SUBSCRIPTION_AVAILABLE   = 40
-    SUBSCRIPTION_IDENTIFIER_AVAILABLE = 41
-    SHARED_SUBSCRIPTION_AVAILABLE     = 42
 
 
 class DisconnectReasonCode(enum.IntEnum):
@@ -158,6 +128,36 @@ class PubrelReasonCode(enum.IntEnum):
 class PubcompReasonCode(enum.IntEnum):
     SUCCESS = 0
     PACKET_IDENTIFIER_NOT_FOUND = 146
+
+
+class PropertyIds(enum.IntEnum):
+    PAYLOAD_FORMAT_INDICATOR          = 1
+    MESSAGE_EXPIRY_INTERVAL           = 2
+    CONTENT_TYPE                      = 3
+    RESPONSE_TOPIC                    = 8
+    CORRELATION_DATA                  = 9
+    SUBSCRIPTION_IDENTIFIER           = 11
+    SESSION_EXPIRY_INTERVAL           = 17
+    ASSIGNED_CLIENT_IDENTIFIER        = 18
+    SERVER_KEEP_ALIVE                 = 19
+    AUTHENTICATION_METHOD             = 21
+    AUTHENTICATION_DATA               = 22
+    REQUEST_PROBLEM_INFORMATION       = 23
+    WILL_DELAY_INTERVAL               = 24
+    REQUEST_RESPONSE_INFORMATION      = 25
+    RESPONSE_INFORMATION              = 26
+    SERVER_REFERENCE                  = 28
+    REASON_STRING                     = 31
+    RECEIVE_MAXIMUM                   = 33
+    TOPIC_ALIAS_MAXIMUM               = 34
+    TOPIC_ALIAS                       = 35
+    MAXIMUM_QOS                       = 36
+    RETAIN_AVAILABLE                  = 37
+    USER_PROPERTY                     = 38
+    MAXIMUM_PACKET_SIZE               = 39
+    WILDCARD_SUBSCRIPTION_AVAILABLE   = 40
+    SUBSCRIPTION_IDENTIFIER_AVAILABLE = 41
+    SHARED_SUBSCRIPTION_AVAILABLE     = 42
 
 
 class QoS(enum.IntEnum):
@@ -492,6 +492,7 @@ def unpack_connect(payload):
         raise MalformedPacketError()
 
     flags = unpack_u8(payload)
+    clean_start = bool(flags & CLEAN_START)
     keep_alive_s = unpack_u16(payload)
     properties = unpack_properties(
         'CONNECT',
@@ -512,7 +513,7 @@ def unpack_connect(payload):
     if flags & WILL_FLAG:
         raise MalformedPacketError()
 
-    return client_id, keep_alive_s, properties
+    return client_id, clean_start, keep_alive_s, properties
 
 
 def pack_connack(session_present,
@@ -650,6 +651,22 @@ def pack_unsubscribe(topic, packet_identifier):
                                len(packed_topic) + 3)
     packed += struct.pack('>HB', packet_identifier, 0)
     packed += packed_topic
+
+    return packed
+
+
+def unpack_unsubscribe(payload):
+    packet_identifier = unpack_u16(payload)
+    unpack_u8(payload)
+    topic = unpack_string(payload)
+
+    return packet_identifier, topic
+
+
+def pack_unsuback(packet_identifier):
+    packed = pack_fixed_header(ControlPacketType.UNSUBSCRIBE, 0, 3)
+    packed += pack_u16(packet_identifier)
+    packed += pack_properties('UNSUBACK', {})
 
     return packed
 
