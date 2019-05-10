@@ -1,16 +1,12 @@
 import asyncio
 import bitstruct
 import logging
-import binascii
 from collections import defaultdict
 
 from .common import ControlPacketType
-from .common import DisconnectReasonCode
 from .common import PropertyIds
 from .common import MalformedPacketError
 from .common import PayloadReader
-from .common import control_packet_type_to_string
-from .common import unpack_packet_type
 from .common import unpack_connect
 from .common import pack_connack
 from .common import pack_publish

@@ -1,8 +1,6 @@
-import os
 import logging
 import asyncio
 import enum
-import binascii
 import uuid
 import bitstruct
 
@@ -11,8 +9,6 @@ from .common import ConnectReasonCode
 from .common import PropertyIds
 from .common import DisconnectReasonCode
 from .common import QoS
-from .common import control_packet_type_to_string
-from .common import unpack_packet_type
 from .common import pack_connect
 from .common import unpack_connack
 from .common import pack_disconnect

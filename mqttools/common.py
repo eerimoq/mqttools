@@ -212,15 +212,6 @@ class PayloadReader(BytesIO):
         return at_end
 
 
-def control_packet_type_to_string(control_packet_type):
-    try:
-        name = ControlPacketType(control_packet_type).name
-    except ValueError:
-        name = 'UNKNOWN'
-
-    return f'{name}({control_packet_type})'
-
-
 def pack_string(data):
     data = data.encode('utf-8')
     packed = struct.pack('>H', len(data))
