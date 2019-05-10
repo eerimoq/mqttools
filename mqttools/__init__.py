@@ -47,7 +47,7 @@ def main():
     args = parser.parse_args()
 
     level = logging.getLevelName(args.log_level.upper())
-    logging.basicConfig(level=level)
+    logging.basicConfig(level=level, format='%(asctime)s %(message)s')
 
     if args.debug:
         args.func(args)

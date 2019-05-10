@@ -26,6 +26,10 @@ from .common import unpack_disconnect
 LOGGER = logging.getLogger(__name__)
 
 
+class DisconnectError(Exception):
+    pass
+
+
 class Session(object):
 
     def __init__(self):
@@ -68,6 +72,10 @@ class Client(object):
                     f'Unsupported or invalid packet type {packet_type}.')
 
             await self.reader_loop()
+        except DisconnectError:
+            pass
+        except asyncio.IncompleteReadError:
+            LOGGER.debug('Client connection lost.')
         except Exception as e:
             LOGGER.debug('Reader task stopped by %r.', e)
 
@@ -161,7 +169,7 @@ class Client(object):
     def on_disconnect(self, payload):
         unpack_disconnect(payload)
 
-        raise Exception()
+        raise DisconnectError()
 
     def publish(self, topic, message):
         self._write_packet(pack_publish(topic, message, None))
