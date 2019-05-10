@@ -4,6 +4,7 @@ import struct
 import enum
 from io import BytesIO
 import bitstruct
+from binascii import hexlify
 
 
 # Connection flags.
@@ -293,19 +294,7 @@ def pack_property(property_id, value):
     }[property_id](value)
 
 
-def log_properties(packet_name, properties):
-    if LOGGER.isEnabledFor(logging.DEBUG):
-        LOGGER.debug('%s properties:', packet_name)
-
-        for identifier, value in properties.items():
-            LOGGER.debug('  %s(%d): %s',
-                         identifier.name,
-                         identifier.value,
-                         value)
-
-
 def pack_properties(packet_name, properties):
-    log_properties(packet_name, properties)
     packed = b''
 
     for property_id, value in properties.items():
@@ -366,8 +355,6 @@ def unpack_properties(packet_name,
 
         property_id = PropertyIds(property_id)
         properties[property_id] = unpack_property(property_id, payload)
-
-    log_properties(packet_name, properties)
 
     return properties
 
@@ -622,7 +609,7 @@ def unpack_subscribe(payload):
         topics.append(unpack_string(payload))
         unpack_u8(payload)
 
-    return topics, packet_identifier
+    return packet_identifier, topics
 
 
 def pack_suback(packet_identifier):
@@ -662,9 +649,12 @@ def pack_unsubscribe(topic, packet_identifier):
 def unpack_unsubscribe(payload):
     packet_identifier = unpack_u16(payload)
     unpack_u8(payload)
-    topic = unpack_string(payload)
+    topics = []
 
-    return packet_identifier, topic
+    while payload.is_data_available():
+        topics.append(unpack_string(payload))
+
+    return packet_identifier, topics
 
 
 def pack_unsuback(packet_identifier):
@@ -735,3 +725,122 @@ def pack_pingreq():
 
 def pack_pingresp():
     return pack_fixed_header(ControlPacketType.PINGRESP, 0, 0)
+
+
+def format_properties(properties):
+    if not properties:
+        return []
+
+    lines = ['  Properties:']
+
+    for identifier, value in properties.items():
+        lines.append(f'    {identifier.name}({identifier.value}): {value}')
+
+    return lines
+
+
+def format_connect(payload):
+    client_id, clean_start, keep_alive_s, properties = unpack_connect(payload)
+
+    return [
+        f'  ClientId:   {client_id}',
+        f'  CleanStart: {clean_start}',
+        f'  KeepAlive:  {keep_alive_s}'
+    ] + format_properties(properties)
+
+
+def format_connack(payload):
+    session_present, reason, properties = unpack_connack(payload)
+
+    return [
+        f'  SessionPresent: {session_present}',
+        f'  Reason: {reason}'
+    ] + format_properties(properties)
+
+
+def format_publish(payload):
+    topic, message, properties = unpack_publish(payload, 0)
+
+    return [
+        f'  Topic:      {topic}',
+        f'  Message:    {message}',
+        f'  Properties:'
+    ] + format_properties(properties)
+
+
+def format_subscribe(payload):
+    packet_identifier, topics = unpack_subscribe(payload)
+
+    return [
+        f'  PacketIdentifier: {packet_identifier}',
+        f'  Topics:'
+    ] + [f'    {topic}' for topic in topics]
+
+
+def format_suback(payload):
+    packet_identifier, properties = unpack_suback(payload)
+
+    return [
+        f'  PacketIdentifier: {packet_identifier}',
+        f'  Properties:'
+    ] + format_properties(properties)
+
+
+def format_unsubscribe(payload):
+    packet_identifier, topics = unpack_unsubscribe(payload)
+
+    return [
+        f'  PacketIdentifier: {packet_identifier}',
+        f'  Topics:'
+    ] + [f'    {topic}' for topic in topics]
+
+
+def format_unsuback(payload):
+    packet_identifier, properties = unpack_unsuback(payload)
+
+    return [
+        f'  PacketIdentifier: {packet_identifier}',
+        f'  Properties:'
+    ] + format_properties(properties)
+
+
+def format_disconnect(payload):
+    reason, properties = unpack_disconnect(payload)
+
+    return [
+        f'  Reason:     {reason}',
+        f'  Properties:'
+    ] + format_properties(properties)
+
+
+def format_packet(prefix, packet):
+    lines = []
+
+    try:
+        packet_type = unpack_packet_type(packet)
+        payload = PayloadReader(packet[1:])
+        size = unpack_variable_integer(payload)
+        packet_kind = packet_type.name
+        lines.append(
+            f'{prefix} {packet_kind}({packet_type.value}) packet {hexlify(packet)}')
+
+        if packet_kind == 'CONNECT':
+            lines += format_connect(payload)
+        elif packet_kind == 'CONNACK':
+            lines += format_connack(payload)
+        elif packet_kind == 'PUBLISH':
+            lines += format_publish(payload)
+        elif packet_kind == 'SUBSCRIBE':
+            lines += format_subscribe(payload)
+        elif packet_kind == 'SUBACK':
+            lines += format_suback(payload)
+        elif packet_kind == 'UNSUBSCRIBE':
+            lines += format_unsubscribe(payload)
+        elif packet_kind == 'UNSUBACK':
+            lines += format_unsuback(payload)
+        elif packet_kind == 'DISCONNECT':
+            lines += format_disconnect(payload)
+    except Exception:
+        lines.append('  *** Malformed packet ***')
+
+    return lines

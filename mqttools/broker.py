@@ -21,6 +21,7 @@ from .common import unpack_unsubscribe
 from .common import pack_unsuback
 from .common import pack_pingresp
 from .common import unpack_disconnect
+from .common import format_packet
 
 
 LOGGER = logging.getLogger(__name__)
@@ -32,7 +33,8 @@ class DisconnectError(Exception):
 
 class Session(object):
 
-    def __init__(self):
+    def __init__(self, client_id):
+        self.client_id = client_id
         self.subscribes = set()
         self.expiry_time = None
         self.client = None
@@ -60,7 +62,7 @@ class Client(object):
     async def serve_forever(self):
         addr = self._writer.get_extra_info('peername')
 
-        LOGGER.info('Serving client %r.', addr)
+        self.log_info('Serving client %r.', addr)
 
         try:
             packet_type, _, payload = await self.read_packet()
@@ -75,14 +77,14 @@ class Client(object):
         except DisconnectError:
             pass
         except asyncio.IncompleteReadError:
-            LOGGER.debug('Client connection lost.')
+            self.log_debug('Client connection lost.')
         except Exception as e:
-            LOGGER.debug('Reader task stopped by %r.', e)
+            self.log_debug('Reader task stopped by %r.', e)
 
         if self._session is not None:
             self._session.client = None
 
-        LOGGER.info('Closing client %r.', addr)
+        self.log_info('Closing client %r.', addr)
 
     async def reader_loop(self):
         while True:
@@ -118,9 +120,8 @@ class Client(object):
         data = await self._reader.readexactly(size)
 
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug("Received %s packet %s.",
-                         control_packet_type_to_string(packet_type),
-                         binascii.hexlify(buf + data))
+            for line in format_packet('Received', buf + data):
+                self.log_debug(line)
 
         return packet_type, flags, PayloadReader(data)
 
@@ -130,12 +131,17 @@ class Client(object):
         self._session, session_present = self._broker.get_session(
             client_id,
             clean_start)
+
+        if session_present:
+            self.log_info('Session resumed with %d subscribes.',
+                          len(self._session.subscribes))
+
         self._session.client = self
         self._write_packet(pack_connack(session_present,
                                         0,
                                         {PropertyIds.MAXIMUM_QOS: 0}))
 
-        LOGGER.info("Client '%s' connected.", client_id)
+        self.log_info('Client connected.')
 
     def on_publish(self, payload):
         topic, message, _ = unpack_publish(payload, 0)
@@ -145,7 +151,7 @@ class Client(object):
             session.client.publish(topic, message)
 
     def on_subscribe(self, payload):
-        topics, packet_identifier = unpack_subscribe(payload)
+        packet_identifier, topics = unpack_subscribe(payload)
 
         for topic in topics:
             validate_topic(topic)
@@ -157,10 +163,15 @@ class Client(object):
         self._write_packet(pack_suback(packet_identifier))
 
     def on_unsubscribe(self, payload):
-        packet_identifier, topic = unpack_unsubscribe(payload)
-        validate_topic(topic)
-        self._session.subscribes.remove(topic)
-        self._broker.remove_subscriber(topic, self._session)
+        packet_identifier, topics = unpack_unsubscribe(payload)
+
+        for topic in topics:
+            validate_topic(topic)
+
+        for topic in topics:
+            self._session.subscribes.remove(topic)
+            self._broker.remove_subscriber(topic, self._session)
+
         self._write_packet(pack_unsuback(packet_identifier))
 
     def on_pingreq(self):
@@ -176,12 +187,24 @@ class Client(object):
 
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug(
-                "Sending %s packet %s.",
-                control_packet_type_to_string(unpack_packet_type(message)),
-                binascii.hexlify(message))
+            for line in format_packet('Sending', message):
+                self.log_debug(line)
 
         self._writer.write(message)
+
+    def log_debug(self, fmt, *args):
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            if self._session is None:
+                LOGGER.debug(fmt, *args)
+            else:
+                LOGGER.debug(f'{self._session.client_id} {fmt}', *args)
+
+    def log_info(self, fmt, *args):
+        if LOGGER.isEnabledFor(logging.INFO):
+            if self._session is None:
+                LOGGER.info(fmt, *args)
+            else:
+                LOGGER.info(f'{self._session.client_id} {fmt}', *args)
 
 
 class Broker(object):
@@ -211,7 +234,7 @@ class Broker(object):
         self._listener_ready.set()
         listener_address = self._listener.sockets[0].getsockname()
 
-        LOGGER.info(f'Listening for clients on {listener_address}.')
+        LOGGER.info('Listening for clients on %s.', listener_address)
 
         async with self._listener:
             await self._listener.serve_forever()
@@ -249,13 +272,9 @@ class Broker(object):
 
                 session.clean()
             else:
-                LOGGER.info(
-                    "Session resumed for client '%s' with %d subscribes.",
-                    client_id,
-                    len(session.subscribes))
                 session_present = True
         else:
-            session = Session()
+            session = Session(client_id)
             self._sessions[client_id] = session
 
         return session, session_present

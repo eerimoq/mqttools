@@ -27,6 +27,7 @@ from .common import pack_pingreq
 from .common import Error
 from .common import MalformedPacketError
 from .common import PayloadReader
+from .common import format_packet
 
 
 LOGGER = logging.getLogger(__name__)
@@ -535,10 +536,8 @@ class Client(object):
 
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug(
-                "Sending %s packet %s.",
-                control_packet_type_to_string(unpack_packet_type(message)),
-                binascii.hexlify(message))
+            for line in format_packet('Sending', message):
+                LOGGER.debug(line)
 
         self._writer.write(message)
 
@@ -558,9 +557,8 @@ class Client(object):
         data = await self._reader.readexactly(size)
 
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug("Received %s packet %s.",
-                         control_packet_type_to_string(packet_type),
-                         binascii.hexlify(buf + data))
+            for line in format_packet('Received', buf + data):
+                LOGGER.debug(line)
 
         return packet_type, flags, PayloadReader(data)
 
