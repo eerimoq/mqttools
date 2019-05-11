@@ -30,8 +30,8 @@ class BrokerTest(unittest.TestCase):
             self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
             writer_1.write(subscribe)
-            suback = await reader_1.readexactly(5)
-            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
 
             # Setup subscriber 2.
             reader_2, writer_2 = await asyncio.open_connection(*address)
@@ -41,8 +41,8 @@ class BrokerTest(unittest.TestCase):
             self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
             writer_2.write(subscribe)
-            suback = await reader_2.readexactly(5)
-            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
+            suback = await reader_2.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
 
             # Setup a publisher.
             reader_3, writer_3 = await asyncio.open_connection(*address)
@@ -74,6 +74,13 @@ class BrokerTest(unittest.TestCase):
             publish = await reader_2.readexactly(12)
             self.assertEqual(publish, b'\x30\x0a\x00\x04/a/b\x00boo')
 
+            # Subscribe to /+/b is an invalid topic in the current
+            # implementation.
+            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/+/b\x00'
+            writer_2.write(subscribe)
+            suback = await reader_2.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x83')
+
             writer_2.close()
             writer_3.close()
             broker_task.cancel()
@@ -95,16 +102,18 @@ class BrokerTest(unittest.TestCase):
         async def tester():
             address = await broker.getsockname()
 
-            # Setup the subscriber. Subscribe to /a/b and /a/c.
+            # Setup the subscriber. Subscribe to /a/a, /a/b, /a/c and /a/d.
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
             writer_1.write(connect)
             connack = await reader_1.readexactly(7)
             self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
-            subscribe = b'\x82\x11\x00\x01\x00\x00\x04/a/b\x00\x00\x04/a/c\x00'
+            subscribe = (
+                b'\x82\x1f\x00\x01\x00\x00\x04/a/a\x00\x00\x04/a/b\x00\x00\x04'
+                b'/a/c\x00\x00\x04/a/d\x00')
             writer_1.write(subscribe)
-            suback = await reader_1.readexactly(5)
-            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
+            suback = await reader_1.readexactly(9)
+            self.assertEqual(suback, b'\x90\x07\x00\x01\x00\x00\x00\x00\x00')
 
             # Setup a publisher.
             reader_2, writer_2 = await asyncio.open_connection(*address)
@@ -113,30 +122,66 @@ class BrokerTest(unittest.TestCase):
             connack = await reader_2.readexactly(7)
             self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
 
-            # Publish /a/b.
-            publish = b'\x30\x0a\x00\x04/a/b\x00apa'
+            # Publish /a/a and /a/c.
+            publish = b'\x30\x0a\x00\x04/a/a\x00apa'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/a/c\x00cow'
+            writer_2.write(publish)
+
+            # Receive /a/a and /a/c in the subscriber.
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/a\x00apa')
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/c\x00cow')
+
+            # Unsubscribe from /a/a and /a/c.
+            unsubscribe = b'\xa2\x0f\x00\x02\x00\x00\x04/a/a\x00\x04/a/c'
+            writer_1.write(unsubscribe)
+            unsuback = await reader_1.readexactly(7)
+            self.assertEqual(unsuback, b'\xb0\x05\x00\x02\x00\x00\x00')
+
+            # Publish /a/a, /a/c and then /a/b, /a/a should not be
+            # received by the subscriber.
+            publish = b'\x30\x0a\x00\x04/a/a\x00apa'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/a/c\x00cow'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/a/b\x00mas'
             writer_2.write(publish)
 
             # Receive /a/b in the subscriber.
             publish = await reader_1.readexactly(12)
-            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/b\x00apa')
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/b\x00mas')
 
             # Unsubscribe from /a/b.
             unsubscribe = b'\xa2\x09\x00\x02\x00\x00\x04/a/b'
             writer_1.write(unsubscribe)
-            unsuback = await reader_1.readexactly(5)
-            self.assertEqual(unsuback, b'\xb0\x03\x00\x02\x00')
+            unsuback = await reader_1.readexactly(6)
+            self.assertEqual(unsuback, b'\xb0\x04\x00\x02\x00\x00')
 
-            # Publish /a/b and then /a/c, /a/b should not be received
+            # Unsubscribe from /a/b again should fail.
+            unsubscribe = b'\xa2\x09\x00\x02\x00\x00\x04/a/b'
+            writer_1.write(unsubscribe)
+            unsuback = await reader_1.readexactly(6)
+            self.assertEqual(unsuback, b'\xb0\x04\x00\x02\x00\x11')
+
+            # Unsubscribe from /a/# is an invalid topic in the current
+            # implementation.
+            unsubscribe = b'\xa2\x09\x00\x02\x00\x00\x04/a/#'
+            writer_1.write(unsubscribe)
+            unsuback = await reader_1.readexactly(6)
+            self.assertEqual(unsuback, b'\xb0\x04\x00\x02\x00\x83')
+
+            # Publish /a/b and then /a/d, /a/b should not be received
             # by the subscriber.
             publish = b'\x30\x0a\x00\x04/a/b\x00apa'
             writer_2.write(publish)
-            publish = b'\x30\x0a\x00\x04/a/c\x00apa'
+            publish = b'\x30\x0a\x00\x04/a/d\x00mas'
             writer_2.write(publish)
 
-            # Receive /a/c in the subscriber.
+            # Receive /a/d in the subscriber.
             publish = await reader_1.readexactly(12)
-            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/c\x00apa')
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/d\x00mas')
 
             writer_1.close()
             writer_2.close()
@@ -167,8 +212,8 @@ class BrokerTest(unittest.TestCase):
             self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
             writer_1.write(subscribe)
-            suback = await reader_1.readexactly(5)
-            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
             writer_1.close()
 
             # Resume the session.
@@ -202,8 +247,8 @@ class BrokerTest(unittest.TestCase):
             self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/c\x00'
             writer_1.write(subscribe)
-            suback = await reader_1.readexactly(5)
-            self.assertEqual(suback, b'\x90\x03\x00\x01\x00')
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
 
             # Publish /a/b and then /a/c.
             publish = b'\x30\x0a\x00\x04/a/b\x00apa'

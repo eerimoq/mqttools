@@ -439,7 +439,7 @@ class Client(object):
         await self._messages.put((topic, message))
 
     def on_suback(self, payload):
-        packet_identifier, properties = unpack_suback(payload)
+        packet_identifier, properties, _ = unpack_suback(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(None)
@@ -449,7 +449,7 @@ class Client(object):
                 packet_identifier)
 
     def on_unsuback(self, payload):
-        packet_identifier, properties = unpack_unsuback(payload)
+        packet_identifier, properties, _ = unpack_unsuback(payload)
 
         if packet_identifier in self.transactions:
             self.transactions[packet_identifier].set_completed(None)

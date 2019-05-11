@@ -122,13 +122,38 @@ class PubrecReasonCode(enum.IntEnum):
 
 
 class PubrelReasonCode(enum.IntEnum):
-    SUCCESS = 0
+    SUCCESS                     = 0
     PACKET_IDENTIFIER_NOT_FOUND = 146
 
 
 class PubcompReasonCode(enum.IntEnum):
-    SUCCESS = 0
+    SUCCESS                     = 0
     PACKET_IDENTIFIER_NOT_FOUND = 146
+
+
+class SubackReasonCode(enum.IntEnum):
+    GRANTED_QOS_0                          = 0
+    GRANTED_QOS_1                          = 1
+    GRANTED_QOS_2                          = 2
+    UNSPECIFIED_ERROR                      = 128
+    IMPLEMENTATION_SPECIFIC_ERROR          = 131
+    NOT_AUTHORIZED                         = 135
+    TOPIC_FILTER_INVALID                   = 143
+    PACKET_IDENTIFIER_IN_USE               = 145
+    QUOTA_EXCEEDED                         = 151
+    SHARED_SUBSCRIPTIONS_NOT_SUPPORTED     = 158
+    SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED = 161
+    WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED   = 162
+
+
+class UnsubackReasonCode(enum.IntEnum):
+    SUCCESS                       = 0
+    NO_SUBSCRIPTION_EXISTED       = 17
+    UNSPECIFIED_ERROR             = 128
+    IMPLEMENTATION_SPECIFIC_ERROR = 131
+    NOT_AUTHORIZED                = 135
+    TOPIC_FILTER_INVALID          = 143
+    PACKET_IDENTIFIER_IN_USE      = 145
 
 
 class PropertyIds(enum.IntEnum):
@@ -603,13 +628,14 @@ def unpack_subscribe(payload):
     return packet_identifier, topics
 
 
-def pack_suback(packet_identifier):
+def pack_suback(packet_identifier, reasons):
     properties = pack_properties('SUBACK', {})
     packed = pack_fixed_header(ControlPacketType.SUBACK,
                                0,
-                               2 + len(properties))
+                               2 + len(properties) + len(reasons))
     packed += pack_u16(packet_identifier)
     packed += properties
+    packed += reasons
 
     return packed
 
@@ -622,8 +648,19 @@ def unpack_suback(payload):
                                        PropertyIds.USER_PROPERTY
                                    ],
                                    payload)
+    reasons = []
 
-    return packet_identifier, properties
+    while payload.is_data_available():
+        reason = unpack_u8(payload)
+
+        try:
+            reason = SubackReasonCode(reason)
+        except ValueError:
+            pass
+
+        reasons.append(reason)
+
+    return packet_identifier, properties, reasons
 
 
 def pack_unsubscribe(topic, packet_identifier):
@@ -648,10 +685,11 @@ def unpack_unsubscribe(payload):
     return packet_identifier, topics
 
 
-def pack_unsuback(packet_identifier):
-    packed = pack_fixed_header(ControlPacketType.UNSUBACK, 0, 3)
+def pack_unsuback(packet_identifier, reasons):
+    packed = pack_fixed_header(ControlPacketType.UNSUBACK, 0, 3 + len(reasons))
     packed += pack_u16(packet_identifier)
     packed += pack_properties('UNSUBACK', {})
+    packed += reasons
 
     return packed
 
@@ -664,8 +702,19 @@ def unpack_unsuback(payload):
                                        PropertyIds.USER_PROPERTY
                                    ],
                                    payload)
+    reasons = []
 
-    return packet_identifier, properties
+    while payload.is_data_available():
+        reason = unpack_u8(payload)
+
+        try:
+            reason = UnsubackReasonCode(reason)
+        except ValueError:
+            pass
+
+        reasons.append(reason)
+
+    return packet_identifier, properties, reasons
 
 
 def pack_publish(topic, message, alias):
@@ -745,7 +794,7 @@ def format_connack(payload):
 
     return [
         f'  SessionPresent: {session_present}',
-        f'  Reason: {reason}'
+        f'  Reason: {reason.name}({reason.value})'
     ] + format_properties(properties)
 
 
@@ -755,7 +804,7 @@ def format_publish(payload):
     return [
         f'  Topic:      {topic}',
         f'  Message:    {message}',
-        f'  Properties:'
+        '  Properties:'
     ] + format_properties(properties)
 
 
@@ -764,17 +813,21 @@ def format_subscribe(payload):
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        f'  Topics:'
+        '  Topics:'
     ] + [f'    {topic}' for topic in topics]
 
 
 def format_suback(payload):
-    packet_identifier, properties = unpack_suback(payload)
+    packet_identifier, properties, reasons = unpack_suback(payload)
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        f'  Properties:'
-    ] + format_properties(properties)
+        '  Properties:'
+    ] + format_properties(properties) + [
+        '  Reasons:'
+    ] + [
+        f'    {reason.name}({reason.value})' for reason in reasons
+    ]
 
 
 def format_unsubscribe(payload):
@@ -782,25 +835,29 @@ def format_unsubscribe(payload):
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        f'  Topics:'
+        '  Topics:'
     ] + [f'    {topic}' for topic in topics]
 
 
 def format_unsuback(payload):
-    packet_identifier, properties = unpack_unsuback(payload)
+    packet_identifier, properties, reasons = unpack_unsuback(payload)
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        f'  Properties:'
-    ] + format_properties(properties)
+        '  Properties:'
+    ] + format_properties(properties) + [
+        '  Reasons:'
+    ] + [
+        f'    {reason.name}({reason.value})' for reason in reasons
+    ]
 
 
 def format_disconnect(payload):
     reason, properties = unpack_disconnect(payload)
 
     return [
-        f'  Reason:     {reason}',
-        f'  Properties:'
+        f'  Reason:     {reason.name}({reason.value})',
+        '  Properties:'
     ] + format_properties(properties)
 
 

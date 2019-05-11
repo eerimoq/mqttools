@@ -4,6 +4,8 @@ import logging
 from collections import defaultdict
 
 from .common import ControlPacketType
+from .common import SubackReasonCode
+from .common import UnsubackReasonCode
 from .common import PropertyIds
 from .common import MalformedPacketError
 from .common import PayloadReader
@@ -41,10 +43,8 @@ class Session(object):
         self.client = None
 
 
-def validate_topic(topic):
-    if '#' in topic or '+' in topic:
-        raise MalformedPacketError(
-            '# and + are not supported in topic patterns.')
+def is_valid_topic(topic):
+    return '#' not in topic and '+' not in topic
 
 
 class Client(object):
@@ -141,34 +141,47 @@ class Client(object):
 
     def on_publish(self, payload):
         topic, message, _ = unpack_publish(payload, 0)
-        validate_topic(topic)
+
+        if not is_valid_topic(topic):
+            raise MalformedPacketError('Invalid topic in publish.')
 
         for session in self._broker.iter_subscribers(topic):
             session.client.publish(topic, message)
 
     def on_subscribe(self, payload):
         packet_identifier, topics = unpack_subscribe(payload)
+        reasons = bytearray()
 
         for topic in topics:
-            validate_topic(topic)
+            if is_valid_topic(topic):
+                self._session.subscribes.add(topic)
+                self._broker.add_subscriber(topic, self._session)
+                reason = SubackReasonCode.GRANTED_QOS_0
+            else:
+                reason = SubackReasonCode.IMPLEMENTATION_SPECIFIC_ERROR
 
-        for topic in topics:
-            self._session.subscribes.add(topic)
-            self._broker.add_subscriber(topic, self._session)
+            reasons.append(reason)
 
-        self._write_packet(pack_suback(packet_identifier))
+        self._write_packet(pack_suback(packet_identifier, reasons))
 
     def on_unsubscribe(self, payload):
         packet_identifier, topics = unpack_unsubscribe(payload)
+        reasons = bytearray()
 
         for topic in topics:
-            validate_topic(topic)
+            if is_valid_topic(topic):
+                if topic in self._session.subscribes:
+                    self._session.subscribes.remove(topic)
+                    self._broker.remove_subscriber(topic, self._session)
+                    reason = UnsubackReasonCode.SUCCESS
+                else:
+                    reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
+            else:
+                reason = UnsubackReasonCode.IMPLEMENTATION_SPECIFIC_ERROR
 
-        for topic in topics:
-            self._session.subscribes.remove(topic)
-            self._broker.remove_subscriber(topic, self._session)
+            reasons.append(reason)
 
-        self._write_packet(pack_unsuback(packet_identifier))
+        self._write_packet(pack_unsuback(packet_identifier, reasons))
 
     def on_pingreq(self):
         self._write_packet(pack_pingresp())
