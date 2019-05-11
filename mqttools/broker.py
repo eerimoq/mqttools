@@ -43,8 +43,8 @@ class Session(object):
         self.client = None
 
 
-def is_valid_topic(topic):
-    return '#' not in topic and '+' not in topic
+def is_wildcards_in_topic(topic):
+    return '#' in topic or '+' in topic
 
 
 class Client(object):
@@ -142,8 +142,8 @@ class Client(object):
     def on_publish(self, payload):
         topic, message, _ = unpack_publish(payload, 0)
 
-        if not is_valid_topic(topic):
-            raise MalformedPacketError('Invalid topic in publish.')
+        if is_wildcards_in_topic(topic):
+            raise MalformedPacketError(f'Invalid topic {topic} in publish.')
 
         for session in self._broker.iter_subscribers(topic):
             session.client.publish(topic, message)
@@ -153,12 +153,12 @@ class Client(object):
         reasons = bytearray()
 
         for topic in topics:
-            if is_valid_topic(topic):
+            if is_wildcards_in_topic(topic):
+                reason = SubackReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED
+            else:
                 self._session.subscribes.add(topic)
                 self._broker.add_subscriber(topic, self._session)
                 reason = SubackReasonCode.GRANTED_QOS_0
-            else:
-                reason = SubackReasonCode.IMPLEMENTATION_SPECIFIC_ERROR
 
             reasons.append(reason)
 
@@ -169,15 +169,12 @@ class Client(object):
         reasons = bytearray()
 
         for topic in topics:
-            if is_valid_topic(topic):
-                if topic in self._session.subscribes:
-                    self._session.subscribes.remove(topic)
-                    self._broker.remove_subscriber(topic, self._session)
-                    reason = UnsubackReasonCode.SUCCESS
-                else:
-                    reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
+            if topic in self._session.subscribes:
+                self._session.subscribes.remove(topic)
+                self._broker.remove_subscriber(topic, self._session)
+                reason = UnsubackReasonCode.SUCCESS
             else:
-                reason = UnsubackReasonCode.IMPLEMENTATION_SPECIFIC_ERROR
+                reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
 
             reasons.append(reason)
 

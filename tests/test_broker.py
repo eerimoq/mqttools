@@ -79,7 +79,7 @@ class BrokerTest(unittest.TestCase):
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/+/b\x00'
             writer_2.write(subscribe)
             suback = await reader_2.readexactly(6)
-            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x83')
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\xa2')
 
             writer_2.close()
             writer_3.close()
@@ -170,7 +170,7 @@ class BrokerTest(unittest.TestCase):
             unsubscribe = b'\xa2\x09\x00\x02\x00\x00\x04/a/#'
             writer_1.write(unsubscribe)
             unsuback = await reader_1.readexactly(6)
-            self.assertEqual(unsuback, b'\xb0\x04\x00\x02\x00\x83')
+            self.assertEqual(unsuback, b'\xb0\x04\x00\x02\x00\x11')
 
             # Publish /a/b and then /a/d, /a/b should not be received
             # by the subscriber.
