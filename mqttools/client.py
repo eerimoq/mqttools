@@ -249,7 +249,7 @@ class Client(object):
         been created instead.
 
         Raises :class:`TimeoutError` if the broker does not
-        acknowledge the connect.
+        acknowledge the connect request.
 
         Raises :class:`ConnectError` if the broker does not accept the
         connect request.
