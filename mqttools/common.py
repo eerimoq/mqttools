@@ -430,15 +430,15 @@ def pack_fixed_header(message_type, flags, size):
     return packed
 
 
-def unpack_packet_type(payload):
-    packet_type = bitstruct.unpack('u4', payload)[0]
+def unpack_fixed_header(payload):
+    packet_type, flags = bitstruct.unpack('u4u4', payload)
 
     try:
         packet_type = ControlPacketType(packet_type)
     except ValueError:
         pass
 
-    return packet_type
+    return packet_type, flags
 
 
 def pack_connect(client_id,
@@ -802,10 +802,16 @@ def format_connack(payload):
     ] + format_properties(properties)
 
 
-def format_publish(payload):
-    topic, message, properties = unpack_publish(payload, 0)
+def format_publish(flags, payload):
+    dup = bool((flags >> 3) & 0x1)
+    qos = ((flags >> 1) & 0x3)
+    retain = bool(flags & 0x1)
+    topic, message, properties = unpack_publish(payload, qos)
 
     return [
+        f'  DupFlag:    {dup}',
+        f'  QoSLevel:   {qos}',
+        f'  Retain:     {retain}',
         f'  Topic:      {topic}',
         f'  Message:    {message}',
         '  Properties:'
@@ -869,7 +875,7 @@ def format_packet(prefix, packet):
     lines = []
 
     try:
-        packet_type = unpack_packet_type(packet)
+        packet_type, flags = unpack_fixed_header(packet)
         payload = PayloadReader(packet[1:])
         size = unpack_variable_integer(payload)
         packet_kind = packet_type.name
@@ -881,7 +887,7 @@ def format_packet(prefix, packet):
         elif packet_kind == 'CONNACK':
             lines += format_connack(payload)
         elif packet_kind == 'PUBLISH':
-            lines += format_publish(payload)
+            lines += format_publish(flags, payload)
         elif packet_kind == 'SUBSCRIBE':
             lines += format_subscribe(payload)
         elif packet_kind == 'SUBACK':
