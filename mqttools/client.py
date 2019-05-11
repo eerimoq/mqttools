@@ -36,21 +36,6 @@ class SessionResumeError(Error):
     pass
 
 
-class ConnectError(Error):
-
-    def __init__(self, reason):
-        super().__init__()
-        self.reason = reason
-
-    def __str__(self):
-        message = f'{self.reason.name}({self.reason.value})'
-
-        if self.reason == ConnectReasonCode.V3_1_1_UNACCEPTABLE_PROTOCOL_VERSION:
-            message += ': The broker does not support protocol version 5.'
-
-        return message
-
-
 class ReasonError(Error):
 
     def __init__(self, reason):
@@ -62,6 +47,17 @@ class ReasonError(Error):
             return f'{self.reason.name}({self.reason.value})'
         else:
             return f'UNKNOWN({self.reason})'
+
+
+class ConnectError(ReasonError):
+
+    def __str__(self):
+        message = f'{self.reason.name}({self.reason.value})'
+
+        if self.reason == ConnectReasonCode.V3_1_1_UNACCEPTABLE_PROTOCOL_VERSION:
+            message += ': The broker does not support protocol version 5.'
+
+        return message
 
 
 class SubscribeError(ReasonError):
@@ -248,9 +244,15 @@ class Client(object):
         or `subscribe()` calls. Call `stop()` to close the connection.
 
         If `resume_session` is ``True``, the client tries to resume
-        the last session in the broker. A `SessionResumeError`
+        the last session in the broker. A :class:`SessionResumeError`
         exception is raised if the resume fails, and a new session has
         been created instead.
+
+        Raises :class:`TimeoutError` if the broker does not
+        acknowledge the connect.
+
+        Raises :class:`ConnectError` if the broker does not accept the
+        connect request.
 
         >>> await client.start()
 
@@ -377,6 +379,12 @@ class Client(object):
     async def subscribe(self, topic):
         """Subscribe to given topic with QoS 0.
 
+        Raises :class:`TimeoutError` if the broker does not
+        acknowledge the subscribe request.
+
+        Raises :class:`SubscribeError` if the broker does not accept
+        the subscribe request.
+
         >>> await client.subscribe('/my/topic')
         >>> await client.messages.get()
         ('/my/topic', b'my-message')
@@ -399,6 +407,12 @@ class Client(object):
 
     async def unsubscribe(self, topic):
         """Unsubscribe from given topic.
+
+        Raises :class:`TimeoutError` if the broker does not
+        acknowledge the unsubscribe request.
+
+        Raises :class:`UnsubscribeError` if the broker does not accept
+        the unsubscribe request.
 
         >>> await client.unsubscribe('/my/topic')
 

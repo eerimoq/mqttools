@@ -17,5 +17,23 @@ Functions and classes
 .. autoclass:: mqttools.Client
     :members:
 
+.. autoclass:: mqttools.Broker
+    :members:
+
 .. autoclass:: mqttools.QoS
+    :members:
+
+.. autoclass:: mqttools.ConnectError
+    :members:
+
+.. autoclass:: mqttools.SessionResumeError
+    :members:
+
+.. autoclass:: mqttools.SubscribeError
+    :members:
+
+.. autoclass:: mqttools.UnsubscribeError
+    :members:
+
+.. autoclass:: mqttools.TimeoutError
     :members:
