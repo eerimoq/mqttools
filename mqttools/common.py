@@ -215,6 +215,10 @@ class MalformedPacketError(Error):
     pass
 
 
+class TimeoutError(Error):
+    pass
+
+
 class PayloadReader(BytesIO):
 
     def read(self, size):

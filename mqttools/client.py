@@ -24,6 +24,7 @@ from .common import unpack_unsuback
 from .common import pack_pingreq
 from .common import Error
 from .common import MalformedPacketError
+from .common import TimeoutError
 from .common import PayloadReader
 from .common import format_packet
 
@@ -335,7 +336,7 @@ class Client(object):
             await asyncio.wait_for(self._connack_event.wait(),
                                    self.response_timeout)
         except asyncio.TimeoutError:
-            raise Error('Timeout waiting for CONNACK from the broker.')
+            raise TimeoutError('Timeout waiting for CONNACK from the broker.')
 
         session_present, reason, properties = self._connack
 
@@ -385,7 +386,12 @@ class Client(object):
         with Transaction(self) as transaction:
             self._write_packet(pack_subscribe(topic,
                                               transaction.packet_identifier))
-            reasons = await transaction.wait_until_completed()
+
+            try:
+                reasons = await transaction.wait_until_completed()
+            except asyncio.TimeoutError:
+                raise TimeoutError('Timeout waiting for SUBACK from the broker.')
+
             reason = reasons[0]
 
             if reason != SubackReasonCode.GRANTED_QOS_0:
@@ -401,7 +407,12 @@ class Client(object):
         with Transaction(self) as transaction:
             self._write_packet(pack_unsubscribe(topic,
                                                 transaction.packet_identifier))
-            reasons = await transaction.wait_until_completed()
+
+            try:
+                reasons = await transaction.wait_until_completed()
+            except asyncio.TimeoutError:
+                raise TimeoutError('Timeout waiting for UNSUBACK from the broker.')
+
             reason = reasons[0]
 
             if reason != UnsubackReasonCode.SUCCESS:

@@ -10,6 +10,7 @@ from .client import SubscribeError
 from .client import UnsubscribeError
 from .broker import Broker
 from .common import MalformedPacketError
+from .common import TimeoutError
 from .common import SubackReasonCode
 from .common import UnsubackReasonCode
 from .common import QoS
