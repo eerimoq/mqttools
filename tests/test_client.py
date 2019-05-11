@@ -5,6 +5,14 @@ import unittest
 import mqttools
 
 
+async def broker_main(listener):
+    async with listener:
+        try:
+            await listener.serve_forever()
+        except asyncio.CancelledError:
+            pass
+
+
 class ClientTest(unittest.TestCase):
 
     def test_connack_timeout(self):
@@ -16,13 +24,6 @@ class ClientTest(unittest.TestCase):
 
         listener = await asyncio.start_server(on_client_connected, 'localhost', 0)
 
-        async def broker_main():
-            async with listener:
-                try:
-                    await listener.serve_forever()
-                except asyncio.CancelledError:
-                    pass
-
         async def client_main():
             client = mqttools.Client(*listener.sockets[0].getsockname(),
                                      'connack',
@@ -33,7 +34,8 @@ class ClientTest(unittest.TestCase):
 
             listener.close()
 
-        await asyncio.wait_for(asyncio.gather(broker_main(), client_main()), 1)
+        await asyncio.wait_for(
+            asyncio.gather(broker_main(listener), client_main()), 1)
 
     def test_subscribe_timeout(self):
         asyncio.run(self.subscribe_timeout())
@@ -44,13 +46,6 @@ class ClientTest(unittest.TestCase):
             writer.write(b'\x20\x03\x00\x00\x00')
 
         listener = await asyncio.start_server(on_client_connected, 'localhost', 0)
-
-        async def broker_main():
-            async with listener:
-                try:
-                    await listener.serve_forever()
-                except asyncio.CancelledError:
-                    pass
 
         async def client_main():
             client = mqttools.Client(*listener.sockets[0].getsockname(),
@@ -63,7 +58,8 @@ class ClientTest(unittest.TestCase):
 
             listener.close()
 
-        await asyncio.wait_for(asyncio.gather(broker_main(), client_main()), 1)
+        await asyncio.wait_for(
+            asyncio.gather(broker_main(listener), client_main()), 1)
 
     def test_unsubscribe_timeout(self):
         asyncio.run(self.unsubscribe_timeout())
@@ -74,13 +70,6 @@ class ClientTest(unittest.TestCase):
             writer.write(b'\x20\x03\x00\x00\x00')
 
         listener = await asyncio.start_server(on_client_connected, 'localhost', 0)
-
-        async def broker_main():
-            async with listener:
-                try:
-                    await listener.serve_forever()
-                except asyncio.CancelledError:
-                    pass
 
         async def client_main():
             client = mqttools.Client(*listener.sockets[0].getsockname(),
@@ -93,7 +82,8 @@ class ClientTest(unittest.TestCase):
 
             listener.close()
 
-        await asyncio.wait_for(asyncio.gather(broker_main(), client_main()), 1)
+        await asyncio.wait_for(
+            asyncio.gather(broker_main(listener), client_main()), 1)
 
     def test_client_id(self):
         client = mqttools.Client('localhost', 0)
