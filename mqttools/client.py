@@ -7,6 +7,8 @@ import bitstruct
 from .common import ControlPacketType
 from .common import ConnectReasonCode
 from .common import PropertyIds
+from .common import SubackReasonCode
+from .common import UnsubackReasonCode
 from .common import DisconnectReasonCode
 from .common import QoS
 from .common import pack_connect
@@ -29,6 +31,10 @@ from .common import format_packet
 LOGGER = logging.getLogger(__name__)
 
 
+class SessionResumeError(Error):
+    pass
+
+
 class ConnectError(Error):
 
     def __init__(self, reason):
@@ -44,11 +50,7 @@ class ConnectError(Error):
         return message
 
 
-class SessionResumeError(Error):
-    pass
-
-
-class PublishError(Error):
+class ReasonError(Error):
 
     def __init__(self, reason):
         super().__init__()
@@ -59,6 +61,14 @@ class PublishError(Error):
             return f'{self.reason.name}({self.reason.value})'
         else:
             return f'UNKNOWN({self.reason})'
+
+
+class SubscribeError(ReasonError):
+    pass
+
+
+class UnsubscribeError(ReasonError):
+    pass
 
 
 class Transaction(object):
@@ -375,7 +385,11 @@ class Client(object):
         with Transaction(self) as transaction:
             self._write_packet(pack_subscribe(topic,
                                               transaction.packet_identifier))
-            await transaction.wait_until_completed()
+            reasons = await transaction.wait_until_completed()
+            reason = reasons[0]
+
+            if reason != SubackReasonCode.GRANTED_QOS_0:
+                raise SubscribeError(reason)
 
     async def unsubscribe(self, topic):
         """Unsubscribe from given topic.
@@ -387,7 +401,11 @@ class Client(object):
         with Transaction(self) as transaction:
             self._write_packet(pack_unsubscribe(topic,
                                                 transaction.packet_identifier))
-            await transaction.wait_until_completed()
+            reasons = await transaction.wait_until_completed()
+            reason = reasons[0]
+
+            if reason != UnsubackReasonCode.SUCCESS:
+                raise UnsubscribeError(reason)
 
     def publish(self, topic, message):
         """Publish given message to given topic with QoS 0.
@@ -439,20 +457,20 @@ class Client(object):
         await self._messages.put((topic, message))
 
     def on_suback(self, payload):
-        packet_identifier, properties, _ = unpack_suback(payload)
+        packet_identifier, properties, reasons = unpack_suback(payload)
 
         if packet_identifier in self.transactions:
-            self.transactions[packet_identifier].set_completed(None)
+            self.transactions[packet_identifier].set_completed(reasons)
         else:
             LOGGER.debug(
                 'Discarding unexpected SUBACK packet with identifier %d.',
                 packet_identifier)
 
     def on_unsuback(self, payload):
-        packet_identifier, properties, _ = unpack_unsuback(payload)
+        packet_identifier, properties, reasons = unpack_unsuback(payload)
 
         if packet_identifier in self.transactions:
-            self.transactions[packet_identifier].set_completed(None)
+            self.transactions[packet_identifier].set_completed(reasons)
         else:
             LOGGER.debug(
                 'Discarding unexpected UNSUBACK packet with identifier %d.',

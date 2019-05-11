@@ -122,6 +122,10 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\x82\n\x00\x02\x00\x00\x04/a/c\x00'),
             # SUBACK
             ('s2c', b'\x90\x04\x00\x02\x00\x00'),
+            # SUBSCRIBE with invalid topic
+            ('c2s', b'\x82\x09\x00\x03\x00\x00\x03/a#\x00'),
+            # SUBACK
+            ('s2c', b'\x90\x04\x00\x03\x00\xa2'),
             # PUBLISH QoS 0
             ('s2c', b'\x30\x0a\x00\x04/a/b\x00apa'),
             # DISCONNECT
@@ -132,6 +136,12 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe('/a/b'))
         self.run_until_complete(client.subscribe('/a/c'))
+
+        with self.assertRaises(mqttools.SubscribeError) as cm:
+            self.run_until_complete(client.subscribe('/a#'))
+
+        self.assertEqual(cm.exception.reason,
+                         mqttools.SubackReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED)
         topic, message = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/a/b')
         self.assertEqual(message, b'apa')
@@ -151,6 +161,10 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xa2\x09\x00\x02\x00\x00\x04/a/b'),
             # UNSUBACK
             ('s2c', b'\xb0\x04\x00\x02\x00\x00'),
+            # UNSUBSCRIBE from non-subscribed topic
+            ('c2s', b'\xa2\x09\x00\x03\x00\x00\x04/a/d'),
+            # UNSUBACK
+            ('s2c', b'\xb0\x04\x00\x03\x00\x11'),
             # DISCONNECT
             ('c2s', b'\xe0\x02\x00\x00')
         ]
@@ -159,6 +173,12 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe('/a/b'))
         self.run_until_complete(client.unsubscribe('/a/b'))
+
+        with self.assertRaises(mqttools.UnsubscribeError) as cm:
+            self.run_until_complete(client.unsubscribe('/a/d'))
+
+        self.assertEqual(cm.exception.reason,
+                         mqttools.UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED)
         self.run_until_complete(client.stop())
 
     def test_publish_qos_0(self):
