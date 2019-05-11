@@ -392,6 +392,18 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\x82\x18\x00\x01\x00\x00\x12/test/mqttools/foo\x00'),
             # SUBACK
             ('s2c', b'\x90\x04\x00\x01\x00\x00'),
+            # PUBLISH using an unknown alias 1
+            (
+                's2c',
+                b'\x30\x22\x00\x00\x03\x23\x00\x01published-with-unknown-alias'
+            ),
+            # PUBLISH using alias an invalid alias 6
+            (
+                's2c',
+                b'\x30\x34\x00\x12/test/mqttools/foo\x03\x23\x00\x06'
+                b'sets-invalid-alias-in-client'
+            ),
+
             # PUBLISH to set alias
             (
                 's2c',

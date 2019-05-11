@@ -95,6 +95,11 @@ class ClientTest(unittest.TestCase):
 
         await asyncio.wait_for(asyncio.gather(broker_main(), client_main()), 1)
 
+    def test_client_id(self):
+        client = mqttools.Client('localhost', 0)
+        self.assertEqual(client.client_id[:9], 'mqttools-')
+
+
 
 logging.basicConfig(level=logging.DEBUG)
 
