@@ -15,7 +15,7 @@ class BrokerTest(unittest.TestCase):
 
         async def broker_wrapper():
             with self.assertRaises(asyncio.CancelledError):
-                await broker.run()
+                await broker.serve_forever()
 
         broker_task = asyncio.create_task(broker_wrapper())
 
@@ -95,7 +95,7 @@ class BrokerTest(unittest.TestCase):
 
         async def broker_wrapper():
             with self.assertRaises(asyncio.CancelledError):
-                await broker.run()
+                await broker.serve_forever()
 
         broker_task = asyncio.create_task(broker_wrapper())
 
@@ -197,7 +197,7 @@ class BrokerTest(unittest.TestCase):
 
         async def broker_wrapper():
             with self.assertRaises(asyncio.CancelledError):
-                await broker.run()
+                await broker.serve_forever()
 
         broker_task = asyncio.create_task(broker_wrapper())
 
@@ -274,7 +274,7 @@ class BrokerTest(unittest.TestCase):
 
         async def broker_wrapper():
             with self.assertRaises(asyncio.CancelledError):
-                await broker.run()
+                await broker.serve_forever()
 
         broker_task = asyncio.create_task(broker_wrapper())
 

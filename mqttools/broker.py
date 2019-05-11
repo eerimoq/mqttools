@@ -233,7 +233,7 @@ class Broker(object):
 
         return self._listener.sockets[0].getsockname()
 
-    async def run(self):
+    async def serve_forever(self):
         """Setup a listener socket and forever serve clients. This coroutine
         only ends if cancelled by the user.
 
