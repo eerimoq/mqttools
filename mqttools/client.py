@@ -240,8 +240,9 @@ class Client(object):
 
     async def start(self, resume_session=False):
         """Open a TCP connection to the broker and perform the MQTT connect
-        procedure. This method must be called before any `publish()`
-        or `subscribe()` calls. Call `stop()` to close the connection.
+        procedure. This method must be called before any
+        :meth:`publish()` or :meth:`subscribe()` calls. Call
+        :meth:`stop()` to close the connection.
 
         If `resume_session` is ``True``, the client tries to resume
         the last session in the broker. A :class:`SessionResumeError`
@@ -295,8 +296,8 @@ class Client(object):
 
     async def stop(self):
         """Try to cleanly disconnect from the broker and then close the TCP
-        connection. Call `start()` after `stop()` to reconnect to the
-        broker.
+        connection. Call :meth:`start()` after :meth:`stop()` to
+        reconnect to the broker.
 
         >>> await client.stop()
 
