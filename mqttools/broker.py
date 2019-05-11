@@ -234,6 +234,11 @@ class Broker(object):
         return self._listener.sockets[0].getsockname()
 
     async def run(self):
+        """Setup a listener socket and forever serve clients. This coroutine
+        only ends if cancelled by the user.
+
+        """
+
         self._listener = await asyncio.start_server(self.serve_client,
                                                     self._host,
                                                     self._port)
