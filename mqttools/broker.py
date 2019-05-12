@@ -25,11 +25,19 @@ from .common import format_packet
 LOGGER = logging.getLogger(__name__)
 
 
+# ToDo: Session expiry. Keep alive.
+
+# ToDo: Server MUST NOT send a DISCONNECT until after it has sent a
+#       CONNACK with Reason Code of less than 0x80.
+
+
 class DisconnectError(Exception):
     pass
 
 
 class Session(object):
+
+    # ToDo: Respect client maximum packet size.
 
     def __init__(self, client_id):
         self.client_id = client_id
@@ -133,9 +141,15 @@ class Client(object):
                           len(self._session.subscribes))
 
         self._session.client = self
-        self._write_packet(pack_connack(session_present,
-                                        0,
-                                        {PropertyIds.MAXIMUM_QOS: 0}))
+        self._write_packet(pack_connack(
+            session_present,
+            0,
+            {
+                PropertyIds.MAXIMUM_QOS: 0,
+                PropertyIds.RETAIN_AVAILABLE: 0,
+                PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE: 0,
+                PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: 0
+            }))
 
         self.log_info('Client connected.')
 

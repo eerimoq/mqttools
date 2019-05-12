@@ -821,6 +821,8 @@ def format_publish(flags, payload):
 def format_subscribe(payload):
     packet_identifier, topics = unpack_subscribe(payload)
 
+    # ToDo: Log Retain Handling, RAP, NL and QoS.
+
     return [
         f'  PacketIdentifier: {packet_identifier}',
         '  Topics:'

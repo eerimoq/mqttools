@@ -26,8 +26,10 @@ class BrokerTest(unittest.TestCase):
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
             writer_1.write(connect)
-            connack = await reader_1.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
             writer_1.write(subscribe)
             suback = await reader_1.readexactly(6)
@@ -37,8 +39,10 @@ class BrokerTest(unittest.TestCase):
             reader_2, writer_2 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su2'
             writer_2.write(connect)
-            connack = await reader_2.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
             writer_2.write(subscribe)
             suback = await reader_2.readexactly(6)
@@ -48,8 +52,10 @@ class BrokerTest(unittest.TestCase):
             reader_3, writer_3 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
             writer_3.write(connect)
-            connack = await reader_3.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_3.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
 
             # Publish a topic.
             publish = b'\x30\x0a\x00\x04/a/b\x00apa'
@@ -106,8 +112,10 @@ class BrokerTest(unittest.TestCase):
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
             writer_1.write(connect)
-            connack = await reader_1.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
             subscribe = (
                 b'\x82\x1f\x00\x01\x00\x00\x04/a/a\x00\x00\x04/a/b\x00\x00\x04'
                 b'/a/c\x00\x00\x04/a/d\x00')
@@ -119,8 +127,10 @@ class BrokerTest(unittest.TestCase):
             reader_2, writer_2 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
             writer_2.write(connect)
-            connack = await reader_2.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
 
             # Publish /a/a and /a/c.
             publish = b'\x30\x0a\x00\x04/a/a\x00apa'
@@ -208,8 +218,10 @@ class BrokerTest(unittest.TestCase):
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x00\x00\x00\x00\x00\x03res'
             writer_1.write(connect)
-            connack = await reader_1.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
             writer_1.write(subscribe)
             suback = await reader_1.readexactly(6)
@@ -220,15 +232,19 @@ class BrokerTest(unittest.TestCase):
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x00\x00\x00\x00\x00\x03res'
             writer_1.write(connect)
-            connack = await reader_1.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x01\x00\x02\x24\x00')
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x01\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
 
             # Setup a publisher.
             reader_2, writer_2 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
             writer_2.write(connect)
-            connack = await reader_2.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
 
             # Publish /a/b.
             publish = b'\x30\x0a\x00\x04/a/b\x00apa'
@@ -243,8 +259,10 @@ class BrokerTest(unittest.TestCase):
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03res'
             writer_1.write(connect)
-            connack = await reader_1.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
             subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/c\x00'
             writer_1.write(subscribe)
             suback = await reader_1.readexactly(6)
@@ -285,8 +303,10 @@ class BrokerTest(unittest.TestCase):
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
             writer_1.write(connect)
-            connack = await reader_1.readexactly(7)
-            self.assertEqual(connack, b'\x20\x05\x00\x00\x02\x24\x00')
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
             pingreq = b'\xc0\x00'
             writer_1.write(pingreq)
             pingresp = await reader_1.readexactly(2)
