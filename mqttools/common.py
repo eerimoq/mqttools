@@ -622,14 +622,20 @@ def pack_subscribe(topic, packet_identifier):
 
 def unpack_subscribe(payload):
     packet_identifier = unpack_u16(payload)
-    unpack_u8(payload)
-    topics = []
+    properties = unpack_properties('SUBSCRIBE',
+                                   [
+                                       PropertyIds.SUBSCRIPTION_IDENTIFIER,
+                                       PropertyIds.USER_PROPERTY
+                                   ],
+                                   payload)
+    subscriptions = []
 
     while payload.is_data_available():
-        topics.append(unpack_string(payload))
-        unpack_u8(payload)
+        topic = unpack_string(payload)
+        options = unpack_u8(payload)
+        subscriptions.append((topic, options))
 
-    return packet_identifier, topics
+    return packet_identifier, properties, subscriptions
 
 
 def pack_suback(packet_identifier, reasons):
@@ -819,14 +825,22 @@ def format_publish(flags, payload):
 
 
 def format_subscribe(payload):
-    packet_identifier, topics = unpack_subscribe(payload)
-
-    # ToDo: Log Retain Handling, RAP, NL and QoS.
-
-    return [
+    packet_identifier, properties, subscriptions = unpack_subscribe(payload)
+    lines = [
         f'  PacketIdentifier: {packet_identifier}',
-        '  Topics:'
-    ] + [f'    {topic}' for topic in topics]
+        '  Subscriptions:'
+    ]
+
+    for topic, flags in subscriptions:
+        lines += [
+            f'    Topic:             {topic}',
+            f'    MaximumQoS:        {flags & 0x3}',
+            f'    NoLocal:           {bool((flags >> 2) & 0x1)}',
+            f'    RetainAsPublished: {bool((flags >> 3) & 0x1)}',
+            f'    RetainHandling:    {(flags >> 4) & 0x3}'
+        ]
+
+    return lines
 
 
 def format_suback(payload):

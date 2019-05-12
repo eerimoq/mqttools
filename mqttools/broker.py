@@ -41,12 +41,12 @@ class Session(object):
 
     def __init__(self, client_id):
         self.client_id = client_id
-        self.subscribes = set()
+        self.subscriptions = set()
         self.expiry_time = None
         self.client = None
 
     def clean(self):
-        self.subscribes = set()
+        self.subscriptions = set()
         self.expiry_time = None
         self.client = None
 
@@ -137,8 +137,8 @@ class Client(object):
             clean_start)
 
         if session_present:
-            self.log_info('Session resumed with %d subscribes.',
-                          len(self._session.subscribes))
+            self.log_info('Session resumed with %d subscriptions.',
+                          len(self._session.subscriptions))
 
         self._session.client = self
         self._write_packet(pack_connack(
@@ -163,14 +163,14 @@ class Client(object):
             session.client.publish(topic, message)
 
     def on_subscribe(self, payload):
-        packet_identifier, topics = unpack_subscribe(payload)
+        packet_identifier, _, subscriptions = unpack_subscribe(payload)
         reasons = bytearray()
 
-        for topic in topics:
+        for topic, _ in subscriptions:
             if is_wildcards_in_topic(topic):
                 reason = SubackReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED
             else:
-                self._session.subscribes.add(topic)
+                self._session.subscriptions.add(topic)
                 self._broker.add_subscriber(topic, self._session)
                 reason = SubackReasonCode.GRANTED_QOS_0
 
@@ -183,8 +183,8 @@ class Client(object):
         reasons = bytearray()
 
         for topic in topics:
-            if topic in self._session.subscribes:
-                self._session.subscribes.remove(topic)
+            if topic in self._session.subscriptions:
+                self._session.subscriptions.remove(topic)
                 self._broker.remove_subscriber(topic, self._session)
                 reason = UnsubackReasonCode.SUCCESS
             else:
@@ -292,7 +292,7 @@ class Broker(object):
             session = self._sessions[client_id]
 
             if clean_start:
-                for topic in session.subscribes:
+                for topic in session.subscriptions:
                     self.remove_subscriber(topic, session)
 
                 session.clean()
