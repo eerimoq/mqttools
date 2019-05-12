@@ -11,6 +11,9 @@ async def subscriber(host, port, client_id, topic, keep_alive_s):
                     keep_alive_s=keep_alive_s,
                     topic_alias_maximum=10)
 
+    print(f"Connecting to '{host}:{port}'.")
+    print()
+
     await client.start()
     await client.subscribe(topic)
 

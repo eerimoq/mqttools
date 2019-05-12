@@ -23,6 +23,9 @@ def create_message_bytes(message, size, number, fmt):
 async def publisher(host, port, client_id, count, size, topic, message):
     client = Client(host, port, client_id)
 
+    print(f"Connecting to '{host}:{port}'.")
+    print()
+
     await client.start()
 
     fmt = '{{:0{}}}'.format(len(str(count - 1)))

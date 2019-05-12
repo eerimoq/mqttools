@@ -69,6 +69,8 @@ messages are printed to standard output.
 .. code-block:: text
 
    $ mqttools subscribe /test/#
+   Connecting to 'broker.hivemq.com:1883'.
+
    Topic:   /test
    Message: 11
    Topic:   /test/mqttools/foo
@@ -82,6 +84,8 @@ Connect to given MQTT broker and publish a message to a topic.
 .. code-block:: text
 
    $ mqttools publish /test/mqttools/foo bar
+   Connecting to 'broker.hivemq.com:1883'.
+
    Published 1 message(s) in 0 seconds from 1 concurrent task(s).
 
 Publish multiple messages as quickly as possible with ``--count`` to
@@ -90,6 +94,8 @@ benchmark the client and the broker.
 .. code-block:: text
 
    $ mqttools publish --count 100 /test/mqttools/foo
+   Connecting to 'broker.hivemq.com:1883'.
+
    Published 100 message(s) in 0.39 seconds from 10 concurrent task(s).
 
 Monitor
