@@ -43,10 +43,7 @@ class ReasonError(Error):
         self.reason = reason
 
     def __str__(self):
-        if isinstance(self.reason, enum.Enum):
-            return f'{self.reason.name}({self.reason.value})'
-        else:
-            return f'UNKNOWN({self.reason})'
+        return f'{self.reason.name}({self.reason.value})'
 
 
 class ConnectError(ReasonError):

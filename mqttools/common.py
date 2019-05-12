@@ -32,6 +32,7 @@ class ControlPacketType(enum.IntEnum):
     PINGREQ     = 12
     PINGRESP    = 13
     DISCONNECT  = 14
+    AUTH        = 15
 
 
 class ConnectReasonCode(enum.IntEnum):
@@ -436,7 +437,7 @@ def unpack_fixed_header(payload):
     try:
         packet_type = ControlPacketType(packet_type)
     except ValueError:
-        pass
+        raise MalformedPacketError(f'Invalid packet type {packet_type}.')
 
     return packet_type, flags
 
@@ -550,12 +551,11 @@ def pack_connack(session_present,
 def unpack_connack(payload):
     flags = unpack_u8(payload)
     session_present = bool(flags & 1)
-    reason = unpack_u8(payload)
 
     try:
-        reason = ConnectReasonCode(reason)
+        reason = ConnectReasonCode(unpack_u8(payload))
     except ValueError:
-        raise MalformedPacketError(f'Invalid CONNACK reason {reason}')
+        raise MalformedPacketError(f'Invalid CONNACK reason {reason}.')
 
     properties = unpack_properties(
         'CONNACK',
@@ -600,7 +600,7 @@ def unpack_disconnect(payload):
     try:
         reason = DisconnectReasonCode(reason)
     except ValueError:
-        pass
+        raise MalformedPacketError(f'Invalid DISCONNECT reason {reason}.')
 
     if payload.is_data_available():
         properties = unpack_properties(
@@ -671,12 +671,10 @@ def unpack_suback(payload):
     reasons = []
 
     while payload.is_data_available():
-        reason = unpack_u8(payload)
-
         try:
-            reason = SubackReasonCode(reason)
+            reason = SubackReasonCode(unpack_u8(payload))
         except ValueError:
-            pass
+            raise MalformedPacketError(f'Invalid SUBACK reason {reason}.')
 
         reasons.append(reason)
 
@@ -725,12 +723,10 @@ def unpack_unsuback(payload):
     reasons = []
 
     while payload.is_data_available():
-        reason = unpack_u8(payload)
-
         try:
-            reason = UnsubackReasonCode(reason)
+            reason = UnsubackReasonCode(unpack_u8(payload))
         except ValueError:
-            pass
+            raise MalformedPacketError(f'Invalid UNSUBACK reason {reason}.')
 
         reasons.append(reason)
 
