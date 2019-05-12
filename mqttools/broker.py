@@ -235,11 +235,7 @@ class Client(object):
         self._write_packet(pack_publish(topic, message, None))
 
     def disconnect(self):
-        if self._disconnect_reason is None:
-            return
-
         self._write_packet(pack_disconnect(self._disconnect_reason))
-        self._disconnect_reason = None
 
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):
