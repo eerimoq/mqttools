@@ -6,6 +6,7 @@ from .common import ControlPacketType
 from .common import ConnectReasonCode
 from .common import SubackReasonCode
 from .common import UnsubackReasonCode
+from .common import DisconnectReasonCode
 from .common import PropertyIds
 from .common import MalformedPacketError
 from .common import PayloadReader
@@ -18,6 +19,7 @@ from .common import pack_suback
 from .common import unpack_unsubscribe
 from .common import pack_unsuback
 from .common import pack_pingresp
+from .common import pack_disconnect
 from .common import unpack_disconnect
 from .common import format_packet
 from .common import CF_FIXED_HEADER
@@ -28,11 +30,16 @@ LOGGER = logging.getLogger(__name__)
 
 # ToDo: Session expiry. Keep alive.
 
-# ToDo: Server MUST NOT send a DISCONNECT until after it has sent a
-#       CONNACK with Reason Code of less than 0x80.
+
+class ConnectError(Exception):
+    pass
 
 
 class DisconnectError(Exception):
+    pass
+
+
+class ProtocolError(Exception):
     pass
 
 
@@ -63,6 +70,7 @@ class Client(object):
         self._reader = reader
         self._writer = writer
         self._session = None
+        self._disconnect_reason = DisconnectReasonCode.NORMAL_DISCONNECTION
 
     async def serve_forever(self):
         addr = self._writer.get_extra_info('peername')
@@ -75,16 +83,22 @@ class Client(object):
             if packet_type == ControlPacketType.CONNECT:
                 self.on_connect(payload)
             else:
-                raise MalformedPacketError(
-                    f'Unsupported or invalid packet type {packet_type}.')
+                raise ConnectError()
 
             await self.reader_loop()
-        except DisconnectError:
+        except (ConnectError, DisconnectError):
             pass
         except asyncio.IncompleteReadError:
             self.log_debug('Client connection lost.')
         except Exception as e:
             self.log_debug('Reader task stopped by %r.', e)
+
+            if isinstance(e, MalformedPacketError):
+                self._disconnect_reason = DisconnectReasonCode.MALFORMED_PACKET
+            elif isinstance(e, ProtocolError):
+                self._disconnect_reason = DisconnectReasonCode.PROTOCOL_ERROR
+
+            self.disconnect()
 
         if self._session is not None:
             self._session.client = None
@@ -106,8 +120,7 @@ class Client(object):
             elif packet_type == ControlPacketType.DISCONNECT:
                 self.on_disconnect(payload)
             else:
-                raise MalformedPacketError(
-                    f'Unsupported or invalid packet type {packet_type}.')
+                raise ProtocolError()
 
     async def read_packet(self):
         buf = await self._reader.readexactly(1)
@@ -164,9 +177,8 @@ class Client(object):
                 PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: 0
             }))
 
-        # ToDo: Clean disconnect.
         if reason != ConnectReasonCode.SUCCESS:
-            raise Exception('Connect failed.')
+            raise ConnectError()
 
         self.log_info('Client connected.')
 
@@ -221,6 +233,13 @@ class Client(object):
 
     def publish(self, topic, message):
         self._write_packet(pack_publish(topic, message, None))
+
+    def disconnect(self):
+        if self._disconnect_reason is None:
+            return
+
+        self._write_packet(pack_disconnect(self._disconnect_reason))
+        self._disconnect_reason = None
 
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):

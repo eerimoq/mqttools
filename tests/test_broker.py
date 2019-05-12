@@ -285,19 +285,19 @@ class BrokerTest(unittest.TestCase):
             address = await broker.getsockname()
 
             # Setup the pinger.
-            reader_1, writer_1 = await asyncio.open_connection(*address)
+            reader, writer = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
-            writer_1.write(connect)
-            connack = await reader_1.readexactly(13)
+            writer.write(connect)
+            connack = await reader.readexactly(13)
             self.assertEqual(
                 connack,
                 b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
             pingreq = b'\xc0\x00'
-            writer_1.write(pingreq)
-            pingresp = await reader_1.readexactly(2)
+            writer.write(pingreq)
+            pingresp = await reader.readexactly(2)
             self.assertEqual(pingresp, b'\xd0\x00')
 
-            writer_1.close()
+            writer.close()
             broker_task.cancel()
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
@@ -313,17 +313,17 @@ class BrokerTest(unittest.TestCase):
 
             # Connect with user name and password, and get 0x86 in
             # response.
-            reader_1, writer_1 = await asyncio.open_connection(*address)
+            reader, writer = await asyncio.open_connection(*address)
             connect = (
                 b'\x10\x1c\x00\x04MQTT\x05\xc0\x00\x00\x00\x00\x03su1\x00\x04user'
                 b'\x00\x04pass')
-            writer_1.write(connect)
-            connack = await reader_1.readexactly(13)
+            writer.write(connect)
+            connack = await reader.readexactly(13)
             self.assertEqual(
                 connack,
                 b'\x20\x0b\x00\x86\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
 
-            writer_1.close()
+            writer.close()
             broker_task.cancel()
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
@@ -339,17 +339,96 @@ class BrokerTest(unittest.TestCase):
 
             # Connect with authentication method, and get 0x8c in
             # response.
-            reader_1, writer_1 = await asyncio.open_connection(*address)
+            reader, writer = await asyncio.open_connection(*address)
             connect = (
                 b'\x10\x1b\x00\x04MQTT\x05\x00\x00\x00\x0b\x15\x00\x08bad-auth'
                 b'\x00\x03su1')
-            writer_1.write(connect)
-            connack = await reader_1.readexactly(13)
+            writer.write(connect)
+            connack = await reader.readexactly(13)
             self.assertEqual(
                 connack,
                 b'\x20\x0b\x00\x8c\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
 
-            writer_1.close()
+            writer.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_missing_connect_packet(self):
+        asyncio.run(self.missing_connect_packet())
+
+    async def missing_connect_packet(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Send a publish packet instead of connect, nothing should
+            # be received in response.
+            reader, writer = await asyncio.open_connection(*address)
+            publish = b'\x30\x0a\x00\x04/a/b\x00apa'
+            writer.write(publish)
+
+            with self.assertRaises(asyncio.TimeoutError):
+                await asyncio.wait_for(reader.read(1), 0.3)
+
+            writer.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_malformed_packet(self):
+        asyncio.run(self.malformed_packet())
+
+    async def malformed_packet(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Malformed publish with property 0 should result in a
+            # disconnect by the broker.
+            reader, writer = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03mal'
+            writer.write(connect)
+            connack = await reader.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            publish = b'\x30\x0b\x01\x00\x04/a/b\x00apa'
+            writer.write(publish)
+            disconnect = await reader.readexactly(4)
+            self.assertEqual(disconnect, b'\xe0\x02\x81\x00')
+
+            writer.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_protocol_error(self):
+        asyncio.run(self.protocol_error())
+
+    async def protocol_error(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # It's a protocol error sending ping response to the
+            # broker. should result in a disconnect by the broker.
+            reader, writer = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03mal'
+            writer.write(connect)
+            connack = await reader.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            pingresp = b'\xd0\x00'
+            writer.write(pingresp)
+            disconnect = await reader.readexactly(4)
+            self.assertEqual(disconnect, b'\xe0\x02\x82\x00')
+
+            writer.close()
             broker_task.cancel()
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
