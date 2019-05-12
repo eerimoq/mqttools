@@ -33,6 +33,8 @@ Broker features:
 QoS level 1 and 2 messages are not yet supprted. A session state
 storage is required to do so, both in the client and the broker.
 
+Authentication is not supported.
+
 MQTT version 5.0 specification:
 https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
 

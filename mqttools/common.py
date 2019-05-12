@@ -520,7 +520,17 @@ def unpack_connect(payload):
     if flags & WILL_FLAG:
         raise MalformedPacketError()
 
-    return client_id, clean_start, keep_alive_s, properties
+    if flags & USER_NAME_FLAG:
+        user_name = unpack_string(payload)
+    else:
+        user_name = None
+
+    if flags & PASSWORD_FLAG:
+        password = unpack_binary(payload)
+    else:
+        password = None
+
+    return client_id, clean_start, keep_alive_s, properties, user_name, password
 
 
 def pack_connack(session_present,
@@ -790,12 +800,19 @@ def format_properties(properties):
 
 
 def format_connect(payload):
-    client_id, clean_start, keep_alive_s, properties = unpack_connect(payload)
+    (client_id,
+     clean_start,
+     keep_alive_s,
+     properties,
+     user_name,
+     password) = unpack_connect(payload)
 
     return [
         f'  ClientId:   {client_id}',
         f'  CleanStart: {clean_start}',
-        f'  KeepAlive:  {keep_alive_s}'
+        f'  KeepAlive:  {keep_alive_s}',
+        f'  UserName:   {user_name}',
+        f'  Password:   {password}'
     ] + format_properties(properties)
 
 

@@ -7,17 +7,20 @@ import mqttools
 
 class BrokerTest(unittest.TestCase):
 
-    def test_multiple_subscribers(self):
-        asyncio.run(self.multiple_subscribers())
-
-    async def multiple_subscribers(self):
+    def create_broker(self):
         broker = mqttools.Broker('localhost', 0)
 
         async def broker_wrapper():
             with self.assertRaises(asyncio.CancelledError):
                 await broker.serve_forever()
 
-        broker_task = asyncio.create_task(broker_wrapper())
+        return broker, asyncio.create_task(broker_wrapper())
+
+    def test_multiple_subscribers(self):
+        asyncio.run(self.multiple_subscribers())
+
+    async def multiple_subscribers(self):
+        broker, broker_task = self.create_broker()
 
         async def tester():
             address = await broker.getsockname()
@@ -97,13 +100,7 @@ class BrokerTest(unittest.TestCase):
         asyncio.run(self.unsubscribe())
 
     async def unsubscribe(self):
-        broker = mqttools.Broker('localhost', 0)
-
-        async def broker_wrapper():
-            with self.assertRaises(asyncio.CancelledError):
-                await broker.serve_forever()
-
-        broker_task = asyncio.create_task(broker_wrapper())
+        broker, broker_task = self.create_broker()
 
         async def tester():
             address = await broker.getsockname()
@@ -203,13 +200,7 @@ class BrokerTest(unittest.TestCase):
         asyncio.run(self.resume_session())
 
     async def resume_session(self):
-        broker = mqttools.Broker('localhost', 0)
-
-        async def broker_wrapper():
-            with self.assertRaises(asyncio.CancelledError):
-                await broker.serve_forever()
-
-        broker_task = asyncio.create_task(broker_wrapper())
+        broker, broker_task = self.create_broker()
 
         async def tester():
             address = await broker.getsockname()
@@ -288,13 +279,7 @@ class BrokerTest(unittest.TestCase):
         asyncio.run(self.ping())
 
     async def ping(self):
-        broker = mqttools.Broker('localhost', 0)
-
-        async def broker_wrapper():
-            with self.assertRaises(asyncio.CancelledError):
-                await broker.serve_forever()
-
-        broker_task = asyncio.create_task(broker_wrapper())
+        broker, broker_task = self.create_broker()
 
         async def tester():
             address = await broker.getsockname()
@@ -311,6 +296,58 @@ class BrokerTest(unittest.TestCase):
             writer_1.write(pingreq)
             pingresp = await reader_1.readexactly(2)
             self.assertEqual(pingresp, b'\xd0\x00')
+
+            writer_1.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_authentication_with_user_name_and_password(self):
+        asyncio.run(self.authentication_with_user_name_and_password())
+
+    async def authentication_with_user_name_and_password(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Connect with user name and password, and get 0x86 in
+            # response.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = (
+                b'\x10\x1c\x00\x04MQTT\x05\xc0\x00\x00\x00\x00\x03su1\x00\x04user'
+                b'\x00\x04pass')
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x86\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            writer_1.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_authentication_method(self):
+        asyncio.run(self.authentication_method())
+
+    async def authentication_method(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Connect with authentication method, and get 0x8c in
+            # response.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = (
+                b'\x10\x1b\x00\x04MQTT\x05\x00\x00\x00\x0b\x15\x00\x08bad-auth'
+                b'\x00\x03su1')
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x8c\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
 
             writer_1.close()
             broker_task.cancel()

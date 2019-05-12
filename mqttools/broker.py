@@ -4,6 +4,7 @@ import logging
 from collections import defaultdict
 
 from .common import ControlPacketType
+from .common import ConnectReasonCode
 from .common import SubackReasonCode
 from .common import UnsubackReasonCode
 from .common import PropertyIds
@@ -130,8 +131,12 @@ class Client(object):
         return packet_type, flags, PayloadReader(data)
 
     def on_connect(self, payload):
-        client_id, clean_start, keep_alive_s, properties = unpack_connect(
-            payload)
+        (client_id,
+         clean_start,
+         keep_alive_s,
+         properties,
+         user_name,
+         password) = unpack_connect(payload)
         self._session, session_present = self._broker.get_session(
             client_id,
             clean_start)
@@ -141,15 +146,27 @@ class Client(object):
                           len(self._session.subscriptions))
 
         self._session.client = self
+        reason = ConnectReasonCode.SUCCESS
+
+        if PropertyIds.AUTHENTICATION_METHOD in properties:
+            reason = ConnectReasonCode.BAD_AUTHENTICATION_METHOD
+
+        if (user_name is not None) or (password is not None):
+            reason = ConnectReasonCode.BAD_USER_NAME_OR_PASSWORD
+
         self._write_packet(pack_connack(
             session_present,
-            0,
+            reason,
             {
                 PropertyIds.MAXIMUM_QOS: 0,
                 PropertyIds.RETAIN_AVAILABLE: 0,
                 PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE: 0,
                 PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: 0
             }))
+
+        # ToDo: Clean disconnect.
+        if reason != ConnectReasonCode.SUCCESS:
+            raise Exception('Connect failed.')
 
         self.log_info('Client connected.')
 
