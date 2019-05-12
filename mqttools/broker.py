@@ -1,5 +1,4 @@
 import asyncio
-import bitstruct
 import logging
 from collections import defaultdict
 
@@ -21,6 +20,7 @@ from .common import pack_unsuback
 from .common import pack_pingresp
 from .common import unpack_disconnect
 from .common import format_packet
+from .common import CF_FIXED_HEADER
 
 
 LOGGER = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class Client(object):
 
     async def read_packet(self):
         buf = await self._reader.readexactly(1)
-        packet_type, flags = bitstruct.unpack('u4u4', buf)
+        packet_type, flags = CF_FIXED_HEADER.unpack(buf)
         size = 0
         multiplier = 1
         byte = 0x80

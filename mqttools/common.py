@@ -1,4 +1,3 @@
-import os
 import logging
 import struct
 import enum
@@ -204,6 +203,8 @@ class QoS(enum.IntEnum):
 # MQTT 5.0
 PROTOCOL_VERSION = 5
 
+CF_FIXED_HEADER = bitstruct.compile('u4u4')
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -221,6 +222,10 @@ class TimeoutError(Error):
 
 class PayloadReader(BytesIO):
 
+    def __init__(self, data):
+        super().__init__(data)
+        self._length = len(data)
+
     def read(self, size):
         data = super().read(size)
 
@@ -233,12 +238,7 @@ class PayloadReader(BytesIO):
         return super().read()
 
     def is_data_available(self):
-        pos = self.tell()
-        self.seek(0, os.SEEK_END)
-        at_end = (pos < self.tell())
-        self.seek(pos)
-
-        return at_end
+        return self.tell() < self._length
 
 
 def pack_string(data):
@@ -424,14 +424,14 @@ def unpack_variable_integer(payload):
 
 
 def pack_fixed_header(message_type, flags, size):
-    packed = bitstruct.pack('u4u4', message_type, flags)
+    packed = CF_FIXED_HEADER.pack(message_type, flags)
     packed += pack_variable_integer(size)
 
     return packed
 
 
 def unpack_fixed_header(payload):
-    packet_type, flags = bitstruct.unpack('u4u4', payload)
+    packet_type, flags = CF_FIXED_HEADER.unpack(payload)
 
     try:
         packet_type = ControlPacketType(packet_type)
