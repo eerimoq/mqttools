@@ -57,7 +57,7 @@ Installation
 Examples
 ========
 
-There are plent of example in the `examples folder`_.
+There are plenty of examples in the `examples folder`_.
 
 Command line
 ------------
