@@ -18,9 +18,11 @@ async def connect_and_subscribe(client):
         except ConnectionRefusedError:
             print('TCP connect refused.')
         except mqttools.TimeoutError:
-            print('MQTT connect acknowledge not received.')
+            print('MQTT connect or subscribe acknowledge not received.')
         except mqttools.ConnectError as e:
             print(f'MQTT connect failed with reason {e}.')
+        except mqttools.SubscribeError as e:
+            print(f'MQTT subscribe failed with reason {e}.')
 
         # Delay a while before the next connect attempt.
         delays = [1, 2, 4, 8]
