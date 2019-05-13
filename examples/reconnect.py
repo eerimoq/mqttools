@@ -3,6 +3,10 @@ import mqttools
 
 
 async def connect_and_subscribe(client):
+    """Returns once connected to the broker and subscribed to a topic.
+
+    """
+
     attempt = 1
 
     while True:
@@ -43,7 +47,6 @@ async def reconnector():
     while True:
         await connect_and_subscribe(client)
         await handle_messages(client)
-
 
 
 asyncio.run(reconnector())
