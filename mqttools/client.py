@@ -151,7 +151,7 @@ class Client(object):
                  will_topic='',
                  will_message=b'',
                  will_qos=QoS.AT_MOST_ONCE,
-                 keep_alive_s=0,
+                 keep_alive_s=60,
                  response_timeout=5,
                  topic_aliases=None,
                  topic_alias_maximum=0,
