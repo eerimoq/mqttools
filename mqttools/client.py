@@ -246,6 +246,9 @@ class Client(object):
         exception is raised if the resume fails, and a new session has
         been created instead.
 
+        Raises ``ConnectionRefusedError`` if the TCP connection
+        attempt is refused by the broker.
+
         Raises :class:`TimeoutError` if the broker does not
         acknowledge the connect request.
 

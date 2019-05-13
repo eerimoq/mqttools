@@ -57,6 +57,8 @@ Installation
 Examples
 ========
 
+There are plent of example in the `examples folder`_.
+
 Command line
 ------------
 
@@ -183,3 +185,5 @@ An example connecting to an MQTT broker and publishing the message
 
 .. |coverage| image:: https://coveralls.io/repos/github/eerimoq/mqttools/badge.svg?branch=master
 .. _coverage: https://coveralls.io/github/eerimoq/mqttools
+
+.. _examples folder: https://github.com/eerimoq/mqttools/tree/master/examples
