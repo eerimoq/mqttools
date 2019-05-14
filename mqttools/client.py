@@ -154,7 +154,7 @@ class Client(object):
                  keep_alive_s=60,
                  response_timeout=5,
                  topic_aliases=None,
-                 topic_alias_maximum=0,
+                 topic_alias_maximum=10,
                  session_expiry_interval=0,
                  **kwargs):
         self._host = host
@@ -171,8 +171,8 @@ class Client(object):
         self._kwargs = kwargs
         self.response_timeout = response_timeout
         self._connect_properties = {}
-        self._topic_alias_maximum = topic_alias_maximum
-        self._topic_aliases = None
+        self._rx_topic_alias_maximum = topic_alias_maximum
+        self._rx_topic_aliases = None
 
         if topic_alias_maximum > 0:
             self._connect_properties[PropertyIds.TOPIC_ALIAS_MAXIMUM] = (
@@ -185,12 +185,12 @@ class Client(object):
         if topic_aliases is None:
             topic_aliases = []
 
-        self._broker_topic_aliases = None
-        self._broker_topic_aliases_init = {
+        self._tx_topic_aliases = None
+        self._tx_topic_aliases_init = {
             topic: alias
             for alias, topic in enumerate(topic_aliases, 1)
         }
-        self._broker_topic_alias_maximum = None
+        self._tx_topic_alias_maximum = None
         self._registered_broker_topic_aliases = None
         self._reader = None
         self._writer = None
@@ -267,9 +267,9 @@ class Client(object):
 
         """
 
-        self._topic_aliases = {}
-        self._broker_topic_aliases = {}
-        self._broker_topic_alias_maximum = 0
+        self._rx_topic_aliases = {}
+        self._tx_topic_aliases = {}
+        self._tx_topic_alias_maximum = 0
         self._registered_broker_topic_aliases = set()
         self._connack_event = asyncio.Event()
         self._pingresp_event = asyncio.Event()
@@ -348,21 +348,21 @@ class Client(object):
 
         # Topic alias maximum.
         if PropertyIds.TOPIC_ALIAS_MAXIMUM in properties:
-            self._broker_topic_alias_maximum = (
+            self._tx_topic_alias_maximum = (
                 properties[PropertyIds.TOPIC_ALIAS_MAXIMUM])
         else:
-            self._broker_topic_alias_maximum = 0
+            self._tx_topic_alias_maximum = 0
 
-        if len(self._broker_topic_aliases_init) > self._broker_topic_alias_maximum:
+        if len(self._tx_topic_aliases_init) > self._tx_topic_alias_maximum:
             LOGGER.warning('The broker topic alias maximum is %d, which is lower '
                            'than the topic aliases length %d.',
-                           self._broker_topic_alias_maximum,
-                           len(self._broker_topic_aliases_init))
+                           self._tx_topic_alias_maximum,
+                           len(self._tx_topic_aliases_init))
 
-        self._broker_topic_aliases = {
+        self._tx_topic_aliases = {
             topic: alias
-            for topic, alias in self._broker_topic_aliases_init.items()
-            if alias < self._broker_topic_alias_maximum + 1
+            for topic, alias in self._tx_topic_aliases_init.items()
+            if alias < self._tx_topic_alias_maximum + 1
         }
 
         if resume_session and not session_present:
@@ -440,8 +440,8 @@ class Client(object):
 
         """
 
-        if topic in self._broker_topic_aliases:
-            alias = self._broker_topic_aliases[topic]
+        if topic in self._tx_topic_aliases:
+            alias = self._tx_topic_aliases[topic]
 
             if alias in self._registered_broker_topic_aliases:
                 topic = ''
@@ -467,14 +467,14 @@ class Client(object):
 
             if topic == '':
                 try:
-                    topic = self._topic_aliases[alias]
+                    topic = self._rx_topic_aliases[alias]
                 except KeyError:
                     LOGGER.debug(
                         'Unknown topic alias %d received from the broker.',
                         alias)
                     return
-            elif 0 < alias <= self._topic_alias_maximum:
-                self._topic_aliases[alias] = topic
+            elif 0 < alias <= self._rx_topic_alias_maximum:
+                self._rx_topic_aliases[alias] = topic
             else:
                 LOGGER.debug('Invalid topic alias %d received from the broker.',
                              alias)

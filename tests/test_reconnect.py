@@ -26,6 +26,7 @@ class Client(threading.Thread):
                                  self._port,
                                  'goo',
                                  response_timeout=1,
+                                 topic_alias_maximum=0,
                                  keep_alive_s=1)
 
         for _ in range(6):

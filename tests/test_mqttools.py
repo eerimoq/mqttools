@@ -104,7 +104,10 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x02\x00\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, 'bar', keep_alive_s=0)
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 keep_alive_s=0,
+                                 topic_alias_maximum=0)
         self.run_until_complete(client.start())
         self.run_until_complete(client.stop())
 
@@ -132,7 +135,10 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x02\x00\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, 'bar', keep_alive_s=0)
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 keep_alive_s=0,
+                                 topic_alias_maximum=0)
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe('/a/b'))
         self.run_until_complete(client.subscribe('/a/c'))
@@ -169,7 +175,10 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x02\x00\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, 'bar', keep_alive_s=0)
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 keep_alive_s=0,
+                                 topic_alias_maximum=0)
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe('/a/b'))
         self.run_until_complete(client.unsubscribe('/a/b'))
@@ -193,7 +202,10 @@ class MQTToolsTest(unittest.TestCase):
             ('c2s', b'\xe0\x02\x00\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, 'bar', keep_alive_s=0)
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 keep_alive_s=0,
+                                 topic_alias_maximum=0)
         self.run_until_complete(client.start())
         client.publish('/a/b', b'apa')
         self.run_until_complete(client.stop())
@@ -201,7 +213,11 @@ class MQTToolsTest(unittest.TestCase):
     def test_command_line_publish_qos_0(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
-            ('c2s', b'\x10\x1d\x00\x04MQTT\x05\x02\x00<\x00\x00\x10mqttools_publish'),
+            (
+                'c2s',
+                b'\x10\x20\x00\x04MQTT\x05\x02\x00<\x03"\x00\n\x00\x10'
+                b'mqttools_publish'
+            ),
             # CONNACK
             ('s2c', b'\x20\x03\x00\x00\x00'),
             # PUBLISH
@@ -233,7 +249,8 @@ class MQTToolsTest(unittest.TestCase):
             # CONNECT
             (
                 'c2s',
-                b'\x10\x1d\x00\x04MQTT\x05\x02\x00<\x00\x00\x10mqttools_publish'
+                b'\x10\x20\x00\x04MQTT\x05\x02\x00<\x03"\x00\n\x00\x10'
+                b'mqttools_publish'
             ),
             # CONNACK
             ('s2c', b'\x20\x03\x00\x00\x00'),
@@ -264,7 +281,11 @@ class MQTToolsTest(unittest.TestCase):
     def test_command_line_publish_qos_0_generate_short_message(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT
-            ('c2s', b'\x10\x1d\x00\x04MQTT\x05\x02\x00<\x00\x00\x10mqttools_publish'),
+            (
+                'c2s',
+                b'\x10\x20\x00\x04MQTT\x05\x02\x00<\x03"\x00\n\x00\x10'
+                b'mqttools_publish'
+            ),
             # CONNACK
             ('s2c', b'\x20\x03\x00\x00\x00'),
             # PUBLISH
@@ -337,6 +358,7 @@ class MQTToolsTest(unittest.TestCase):
                                  topic_aliases=[
                                      '/test/mqttools/foo'
                                  ],
+                                 topic_alias_maximum=0,
                                  keep_alive_s=0)
         self.run_until_complete(client.start())
         client.publish('/test/mqttools/foo', b'sets-alias-in-broker')
@@ -363,6 +385,7 @@ class MQTToolsTest(unittest.TestCase):
                                  topic_aliases=[
                                      '/foo'
                                  ],
+                                 topic_alias_maximum=0,
                                  keep_alive_s=0)
         self.run_until_complete(client.start())
         client.publish('/foo', b'apa')
@@ -377,7 +400,10 @@ class MQTToolsTest(unittest.TestCase):
             ('s2c', b'\x20\x03\x00\x80\x00')
         ]
 
-        client = mqttools.Client(*self.broker.address, 'bar', keep_alive_s=0)
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 topic_alias_maximum=0,
+                                 keep_alive_s=0)
 
         with self.assertRaises(mqttools.ConnectError) as cm:
             self.run_until_complete(client.start())
@@ -464,6 +490,7 @@ class MQTToolsTest(unittest.TestCase):
         client = mqttools.Client(*self.broker.address,
                                  'bar',
                                  session_expiry_interval=120,
+                                 topic_alias_maximum=0,
                                  keep_alive_s=0)
 
         with self.assertRaises(mqttools.SessionResumeError):

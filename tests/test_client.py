@@ -27,7 +27,8 @@ class ClientTest(unittest.TestCase):
         async def client_main():
             client = mqttools.Client(*listener.sockets[0].getsockname(),
                                      'connack',
-                                     response_timeout=0.1)
+                                     response_timeout=0.1,
+                                     topic_alias_maximum=0)
 
             with self.assertRaises(mqttools.TimeoutError):
                 await client.start()
@@ -50,7 +51,8 @@ class ClientTest(unittest.TestCase):
         async def client_main():
             client = mqttools.Client(*listener.sockets[0].getsockname(),
                                      'suback',
-                                     response_timeout=0.1)
+                                     response_timeout=0.1,
+                                     topic_alias_maximum=0)
             await client.start()
 
             with self.assertRaises(mqttools.TimeoutError):
@@ -74,7 +76,8 @@ class ClientTest(unittest.TestCase):
         async def client_main():
             client = mqttools.Client(*listener.sockets[0].getsockname(),
                                      'unsuback',
-                                     response_timeout=0.1)
+                                     response_timeout=0.1,
+                                     topic_alias_maximum=0)
             await client.start()
 
             with self.assertRaises(mqttools.TimeoutError):
