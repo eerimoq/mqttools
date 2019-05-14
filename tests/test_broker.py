@@ -433,6 +433,57 @@ class BrokerTest(unittest.TestCase):
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
 
+    def test_maximum_packet_size(self):
+        asyncio.run(self.maximum_packet_size())
+
+    async def maximum_packet_size(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Connect with maximum packet size set to 50.
+            reader, writer = await asyncio.open_connection(*address)
+            connect = (
+                b'\x10\x15\x00\x04MQTT\x05\x00\x00\x00\x05\x27\x00\x00\x00\x32'
+                b'\x00\x03su1')
+            writer.write(connect)
+            connack = await reader.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Subscribe to a topic.
+            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
+            writer.write(subscribe)
+            suback = await reader.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Publish a message of 51 bytes on the subscribed topic,
+            # and then one of 50 bytes.
+            publish = (
+                b'\x30\x31\x00\x04/a/b\x001234567890012345678900123456789001234'
+                b'56789')
+            self.assertEqual(len(publish), 51)
+            writer.write(publish)
+            publish = (
+                b'\x30\x30\x00\x04/a/b\x001234567890012345678900123456789001234'
+                b'5678')
+            self.assertEqual(len(publish), 50)
+            writer.write(publish)
+
+            # Only the short packet is received.
+            publish = await reader.readexactly(50)
+            self.assertEqual(
+                publish,
+                b'\x30\x30\x00\x04/a/b\x001234567890012345678900123456789001234'
+                b'5678')
+
+            writer.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
 
 logging.basicConfig(level=logging.DEBUG)
 

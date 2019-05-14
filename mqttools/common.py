@@ -206,6 +206,8 @@ PROTOCOL_VERSION = 5
 
 CF_FIXED_HEADER = bitstruct.compile('u4u4')
 
+MAXIMUM_PACKET_SIZE = 268435455  # (128 ^ 4 - 1)
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -909,7 +911,8 @@ def format_packet(prefix, packet):
         size = unpack_variable_integer(payload)
         packet_kind = packet_type.name
         lines.append(
-            f'{prefix} {packet_kind}({packet_type.value}) packet {hexlify(packet)}')
+            f'{prefix} {packet_kind}({packet_type.value}) packet of {len(packet)} '
+            f'byte(s) with data {hexlify(packet)}')
 
         if packet_kind == 'CONNECT':
             lines += format_connect(payload)

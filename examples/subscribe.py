@@ -7,7 +7,7 @@ async def subscriber():
 
     await client.start()
 
-    # Subscribe to three topics in parallel.
+    # Subscribe to two topics in parallel.
     await asyncio.gather(
         client.subscribe('$SYS/#'),
         client.subscribe('/test/mqttools/foo')

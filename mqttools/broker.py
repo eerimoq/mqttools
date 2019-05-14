@@ -23,6 +23,7 @@ from .common import pack_disconnect
 from .common import unpack_disconnect
 from .common import format_packet
 from .common import CF_FIXED_HEADER
+from .common import MAXIMUM_PACKET_SIZE
 
 
 LOGGER = logging.getLogger(__name__)
@@ -45,18 +46,18 @@ class ProtocolError(Exception):
 
 class Session(object):
 
-    # ToDo: Respect client maximum packet size.
-
     def __init__(self, client_id):
         self.client_id = client_id
         self.subscriptions = set()
         self.expiry_time = None
         self.client = None
+        self.maximum_packet_size = MAXIMUM_PACKET_SIZE
 
     def clean(self):
         self.subscriptions = set()
         self.expiry_time = None
         self.client = None
+        self.maximum_packet_size = MAXIMUM_PACKET_SIZE
 
 
 def is_wildcards_in_topic(topic):
@@ -164,6 +165,10 @@ class Client(object):
         if PropertyIds.AUTHENTICATION_METHOD in properties:
             reason = ConnectReasonCode.BAD_AUTHENTICATION_METHOD
 
+        if PropertyIds.MAXIMUM_PACKET_SIZE in properties:
+            maximum_packet_size = properties[PropertyIds.MAXIMUM_PACKET_SIZE]
+            self._session.maximum_packet_size = maximum_packet_size
+
         if (user_name is not None) or (password is not None):
             reason = ConnectReasonCode.BAD_USER_NAME_OR_PASSWORD
 
@@ -239,10 +244,16 @@ class Client(object):
 
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):
-            for line in format_packet('Sending', message):
+            if len(message) <= self._session.maximum_packet_size:
+                prefix = 'Sending'
+            else:
+                prefix = 'Not sending'
+
+            for line in format_packet(prefix, message):
                 self.log_debug(line)
 
-        self._writer.write(message)
+        if len(message) <= self._session.maximum_packet_size:
+            self._writer.write(message)
 
     def log_debug(self, fmt, *args):
         if LOGGER.isEnabledFor(logging.DEBUG):
