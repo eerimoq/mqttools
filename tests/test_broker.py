@@ -83,13 +83,6 @@ class BrokerTest(unittest.TestCase):
             publish = await reader_2.readexactly(12)
             self.assertEqual(publish, b'\x30\x0a\x00\x04/a/b\x00boo')
 
-            # Subscribe to /+/b is an invalid topic in the current
-            # implementation.
-            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/+/b\x00'
-            writer_2.write(subscribe)
-            suback = await reader_2.readexactly(6)
-            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\xa2')
-
             writer_2.close()
             writer_3.close()
             broker_task.cancel()
@@ -189,6 +182,345 @@ class BrokerTest(unittest.TestCase):
             # Receive /a/d in the subscriber.
             publish = await reader_1.readexactly(12)
             self.assertEqual(publish, b'\x30\x0a\x00\x04/a/d\x00mas')
+
+            writer_1.close()
+            writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_multi_level_wildcard_tennis(self):
+        asyncio.run(self.multi_level_wildcard_tennis())
+
+    async def multi_level_wildcard_tennis(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the subscriber and subscribe to
+            # "sport/tennis/player1/#".
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x1c\x00\x01\x00\x00\x16sport/tennis/player1/#\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Setup a publisher.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Publish "sport/tennis/player1".
+            publish = b'\x30\x1a\x00\x14sport/tennis/player1\x00apa'
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(28)
+            self.assertEqual(
+                publish,
+                b'\x30\x1a\x00\x14sport/tennis/player1\x00apa')
+
+            # Publish "sport/tennis/player1/ranking".
+            publish = b'\x30\x22\x00\x1csport/tennis/player1/ranking\x00apa'
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(36)
+            self.assertEqual(
+                publish,
+                b'\x30\x22\x00\x1csport/tennis/player1/ranking\x00apa')
+
+            # Publish "sport/tennis/player1/ranking/wimbledon".
+            publish = (
+                b'\x30\x2c\x00\x26sport/tennis/player1/ranking/wimbledon\x00apa')
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(46)
+            self.assertEqual(
+                publish,
+                b'\x30\x2c\x00\x26sport/tennis/player1/ranking/wimbledon\x00apa')
+
+            writer_1.close()
+            writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_multi_level_wildcard_any(self):
+        asyncio.run(self.multi_level_wildcard_any())
+
+    async def multi_level_wildcard_any(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the subscriber and subscribe to "#".
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x07\x00\x01\x00\x00\x01#\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Setup a publisher.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Publish "sport/tennis/player1".
+            publish = b'\x30\x1a\x00\x14sport/tennis/player1\x00apa'
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(28)
+            self.assertEqual(
+                publish,
+                b'\x30\x1a\x00\x14sport/tennis/player1\x00apa')
+
+            writer_1.close()
+            writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_single_level_wildcard_only(self):
+        asyncio.run(self.single_level_wildcard_only())
+
+    async def single_level_wildcard_only(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the subscriber and subscribe to "+".
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x07\x00\x01\x00\x00\x01+\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Setup a publisher.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Publish "sport".
+            publish = b'\x30\x0b\x00\x05sport\x00apa'
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(13)
+            self.assertEqual(
+                publish,
+                b'\x30\x0b\x00\x05sport\x00apa')
+
+            writer_1.close()
+            writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_single_level_wildcard_middle(self):
+        asyncio.run(self.single_level_wildcard_middle())
+
+    async def single_level_wildcard_middle(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the subscriber and subscribe to "sport/+/player1".
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x15\x00\x01\x00\x00\x0fsport/+/player1\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Setup a publisher.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Publish "sport/tennis/player1".
+            publish = b'\x30\x1a\x00\x14sport/tennis/player1\x00apa'
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(28)
+            self.assertEqual(
+                publish,
+                b'\x30\x1a\x00\x14sport/tennis/player1\x00apa')
+
+            writer_1.close()
+            writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_single_level_wildcard_end(self):
+        asyncio.run(self.single_level_wildcard_end())
+
+    async def single_level_wildcard_end(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the subscriber and subscribe to "sport/tennis/+".
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x14\x00\x01\x00\x00\x0esport/tennis/+\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Setup a publisher.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Publish "sport/tennis/player1/ranking". It should not be
+            # received.
+            publish = b'\x30\x22\x00\x1csport/tennis/player1/ranking\x00apa'
+            writer_2.write(publish)
+
+            # Publish "sport/tennis/player1".
+            publish = b'\x30\x1a\x00\x14sport/tennis/player1\x00apa'
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(28)
+            self.assertEqual(
+                publish,
+                b'\x30\x1a\x00\x14sport/tennis/player1\x00apa')
+
+            # Publish "sport/tennis/player2".
+            publish = b'\x30\x1a\x00\x14sport/tennis/player2\x00apa'
+            writer_2.write(publish)
+
+            # Receive the publish.
+            publish = await reader_1.readexactly(28)
+            self.assertEqual(
+                publish,
+                b'\x30\x1a\x00\x14sport/tennis/player2\x00apa')
+
+            writer_1.close()
+            writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_unsubscribe_wildcard(self):
+        asyncio.run(self.unsubscribe_wildcard())
+
+    async def unsubscribe_wildcard(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the subscriber. Subscribe to a/# and b/+.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = (
+                b'\x82\x11\x00\x01\x00\x00\x04/a/#\x00\x00\x04/b/+\x00')
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(7)
+            self.assertEqual(suback, b'\x90\x05\x00\x01\x00\x00\x00')
+
+            # Setup a publisher.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Publish /a/a and /b/c.
+            publish = b'\x30\x0a\x00\x04/a/a\x00apa'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/b/c\x00cow'
+            writer_2.write(publish)
+
+            # Receive /a/a and /b/c in the subscriber.
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/a\x00apa')
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/b/c\x00cow')
+
+            # Unsubscribe from /a/#.
+            unsubscribe = b'\xa2\x09\x00\x02\x00\x00\x04/a/#'
+            writer_1.write(unsubscribe)
+            unsuback = await reader_1.readexactly(6)
+            self.assertEqual(unsuback, b'\xb0\x04\x00\x02\x00\x00')
+
+            # Publish /a/a and then /b/c, /a/a should not be received
+            # by the subscriber.
+            publish = b'\x30\x0a\x00\x04/a/a\x00apa'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/b/c\x00cow'
+            writer_2.write(publish)
+
+            # Receive /b/c in the subscriber.
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/b/c\x00cow')
 
             writer_1.close()
             writer_2.close()

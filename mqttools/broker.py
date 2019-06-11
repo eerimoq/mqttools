@@ -1,3 +1,4 @@
+import re
 import asyncio
 import logging
 from collections import defaultdict
@@ -49,12 +50,14 @@ class Session(object):
     def __init__(self, client_id):
         self.client_id = client_id
         self.subscriptions = set()
+        self.wildcard_subscriptions = set()
         self.expiry_time = None
         self.client = None
         self.maximum_packet_size = MAXIMUM_PACKET_SIZE
 
     def clean(self):
         self.subscriptions = set()
+        self.wildcard_subscriptions = set()
         self.expiry_time = None
         self.client = None
         self.maximum_packet_size = MAXIMUM_PACKET_SIZE
@@ -156,8 +159,11 @@ class Client(object):
             clean_start)
 
         if session_present:
-            self.log_info('Session resumed with %d subscriptions.',
-                          len(self._session.subscriptions))
+            self.log_info(
+                'Session resumed with %d simple and %d wildcard '
+                'subscriptions.',
+                len(self._session.subscriptions),
+                len(self._session.wildcard_subscriptions))
 
         self._session.client = self
         reason = ConnectReasonCode.SUCCESS
@@ -202,12 +208,13 @@ class Client(object):
 
         for topic, _ in subscriptions:
             if is_wildcards_in_topic(topic):
-                reason = SubackReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED
+                self._session.wildcard_subscriptions.add(topic)
+                self._broker.add_wildcard_subscriber(topic, self._session)
             else:
                 self._session.subscriptions.add(topic)
                 self._broker.add_subscriber(topic, self._session)
-                reason = SubackReasonCode.GRANTED_QOS_0
 
+            reason = SubackReasonCode.GRANTED_QOS_0
             reasons.append(reason)
 
         self._write_packet(pack_suback(packet_identifier, reasons))
@@ -217,12 +224,20 @@ class Client(object):
         reasons = bytearray()
 
         for topic in topics:
-            if topic in self._session.subscriptions:
-                self._session.subscriptions.remove(topic)
-                self._broker.remove_subscriber(topic, self._session)
-                reason = UnsubackReasonCode.SUCCESS
+            if is_wildcards_in_topic(topic):
+                if topic in self._session.wildcard_subscriptions:
+                    self._session.wildcard_subscriptions.remove(topic)
+                    self._broker.remove_wildcard_subscriber(topic, self._session)
+                    reason = UnsubackReasonCode.SUCCESS
+                else:
+                    reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
             else:
-                reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
+                if topic in self._session.subscriptions:
+                    self._session.subscriptions.remove(topic)
+                    self._broker.remove_subscriber(topic, self._session)
+                    reason = UnsubackReasonCode.SUCCESS
+                else:
+                    reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
 
             reasons.append(reason)
 
@@ -282,6 +297,7 @@ class Broker(object):
         self._port = port
         self._sessions = {}
         self._subscribers = defaultdict(list)
+        self._wildcard_subscribers = []
         self._listener = None
         self._listener_ready = asyncio.Event()
 
@@ -323,10 +339,31 @@ class Broker(object):
         if session in topic_sessions:
             del topic_sessions[topic_sessions.index(session)]
 
+    def add_wildcard_subscriber(self, topic, session):
+        pattern = topic.replace('+', '[^/]*')
+        pattern = pattern.replace('/#', '.*')
+        pattern = pattern.replace('#', '.*')
+        pattern = '^' + pattern + '$'
+        self._wildcard_subscribers.append((topic, session, re.compile(pattern)))
+
+    def remove_wildcard_subscriber(self, topic, session):
+        for index, subscriber in enumerate(self._wildcard_subscribers):
+            print(topic, subscriber)
+            if topic == subscriber[0] and session == subscriber[1]:
+                del self._wildcard_subscribers[index]
+                break
+
     def iter_subscribers(self, topic):
         for session in self._subscribers[topic]:
             if session.client is not None:
                 yield session
+
+        for _, session, re_topic in self._wildcard_subscribers:
+            if session.client is not None:
+                mo = re_topic.match(topic)
+
+                if mo:
+                    yield session
 
     def get_session(self, client_id, clean_start):
         session_present = False
