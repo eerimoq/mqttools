@@ -22,8 +22,7 @@ Client features:
 
 Broker features:
 
-- Subscribe to and publish QoS level 0 topics. Wildcards (# and +) are
-  not supported.
+- Subscribe to and publish QoS level 0 topics.
 
 - Session resume (or clean start support) for less initial
   communication. Session state storage in RAM.
