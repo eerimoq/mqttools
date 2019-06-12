@@ -89,6 +89,90 @@ class BrokerTest(unittest.TestCase):
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
 
+    def test_subscribe_to_same_topic_twice(self):
+        asyncio.run(self.subscribe_to_same_topic_twice())
+
+    async def subscribe_to_same_topic_twice(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Subscribe to "/a/b" and "/b/#" twice, all should be
+            # successful. Subscribe to "/d/e" once.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            for _ in range(2):
+                subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
+                writer_1.write(subscribe)
+                suback = await reader_1.readexactly(6)
+                self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            for _ in range(2):
+                subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/b/#\x00'
+                writer_1.write(subscribe)
+                suback = await reader_1.readexactly(6)
+                self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/d/e\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Setup a publisher.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03pub'
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Publish "/a/b", "/b/c" and "/d/e" once. They should all
+            # be received once.
+            publish = b'\x30\x0a\x00\x04/a/b\x00apa'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/b/c\x00cow'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/d/e\x00123'
+            writer_2.write(publish)
+
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/a/b\x00apa')
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/b/c\x00cow')
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/d/e\x00123')
+
+            # Unsubscribe from "/a/b" and "/b/#" and publish
+            # again. Only "/d/e" should be received.
+            unsubscribe = b'\xa2\x0f\x00\x02\x00\x00\x04/a/b\x00\x04/b/#'
+            writer_1.write(unsubscribe)
+            unsuback = await reader_1.readexactly(7)
+            self.assertEqual(unsuback, b'\xb0\x05\x00\x02\x00\x00\x00')
+
+            publish = b'\x30\x0a\x00\x04/a/b\x00apa'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/b/c\x00cow'
+            writer_2.write(publish)
+            publish = b'\x30\x0a\x00\x04/d/e\x00123'
+            writer_2.write(publish)
+
+            publish = await reader_1.readexactly(12)
+            self.assertEqual(publish, b'\x30\x0a\x00\x04/d/e\x00123')
+
+            writer_1.close()
+            writer_2.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
     def test_unsubscribe(self):
         asyncio.run(self.unsubscribe())
 

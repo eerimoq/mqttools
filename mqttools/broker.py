@@ -208,9 +208,10 @@ class Client(object):
 
         for topic, _ in subscriptions:
             if is_wildcards_in_topic(topic):
-                self._session.wildcard_subscriptions.add(topic)
-                self._broker.add_wildcard_subscriber(topic, self._session)
-            else:
+                if topic not in self._session.wildcard_subscriptions:
+                    self._session.wildcard_subscriptions.add(topic)
+                    self._broker.add_wildcard_subscriber(topic, self._session)
+            elif topic not in self._session.subscriptions:
                 self._session.subscriptions.add(topic)
                 self._broker.add_subscriber(topic, self._session)
 
@@ -224,20 +225,17 @@ class Client(object):
         reasons = bytearray()
 
         for topic in topics:
+            reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
+
             if is_wildcards_in_topic(topic):
                 if topic in self._session.wildcard_subscriptions:
                     self._session.wildcard_subscriptions.remove(topic)
                     self._broker.remove_wildcard_subscriber(topic, self._session)
                     reason = UnsubackReasonCode.SUCCESS
-                else:
-                    reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
-            else:
-                if topic in self._session.subscriptions:
-                    self._session.subscriptions.remove(topic)
-                    self._broker.remove_subscriber(topic, self._session)
-                    reason = UnsubackReasonCode.SUCCESS
-                else:
-                    reason = UnsubackReasonCode.NO_SUBSCRIPTION_EXISTED
+            elif topic in self._session.subscriptions:
+                self._session.subscriptions.remove(topic)
+                self._broker.remove_subscriber(topic, self._session)
+                reason = UnsubackReasonCode.SUCCESS
 
             reasons.append(reason)
 
@@ -348,7 +346,6 @@ class Broker(object):
 
     def remove_wildcard_subscriber(self, topic, session):
         for index, subscriber in enumerate(self._wildcard_subscribers):
-            print(topic, subscriber)
             if topic == subscriber[0] and session == subscriber[1]:
                 del self._wildcard_subscribers[index]
                 break
@@ -374,6 +371,9 @@ class Broker(object):
             if clean_start:
                 for topic in session.subscriptions:
                     self.remove_subscriber(topic, session)
+
+                for topic in session.wildcard_subscriptions:
+                    self.remove_wildcard_subscriber(topic, session)
 
                 session.clean()
             else:
