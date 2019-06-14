@@ -458,7 +458,7 @@ def pack_connect(client_id,
 
     payload_length = len(client_id) + 2
 
-    if will_topic and will_message:
+    if will_topic:
         flags |= WILL_FLAG
 
         if will_qos == 1:
