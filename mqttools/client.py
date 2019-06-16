@@ -268,6 +268,9 @@ class Client(object):
         exception is raised if the resume fails, and a new session has
         been created instead.
 
+        The exceptions below are only raised if ``connect_delays`` is
+        ``[]``.
+
         Raises ``ConnectionRefusedError`` if the TCP connection
         attempt is refused by the broker.
 
@@ -276,6 +279,9 @@ class Client(object):
 
         Raises :class:`ConnectError` if the broker does not accept the
         connect request.
+
+        Raises :class:`SubscribeError` if the broker does not accept
+        the subscribe request(s).
 
         >>> await client.start()
 

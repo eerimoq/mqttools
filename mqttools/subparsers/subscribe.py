@@ -9,23 +9,25 @@ async def subscriber(host, port, client_id, topic, keep_alive_s):
                     port,
                     client_id,
                     keep_alive_s=keep_alive_s,
+                    subscriptions=[topic],
                     topic_alias_maximum=10)
 
-    print(f"Connecting to '{host}:{port}'.")
-    print()
-
-    await client.start()
-    await client.subscribe(topic)
-
     while True:
-        topic, message = await client.messages.get()
+        print(f"Connecting to '{host}:{port}'.")
+        await client.start()
+        print('Connected.')
 
-        if topic is None:
-            print('Broker connection lost!')
-            break
+        while True:
+            topic, message = await client.messages.get()
 
-        print(f'Topic:   {topic}')
-        print(f'Message: {try_decode(message)}')
+            if topic is None:
+                print('Broker connection lost!')
+                break
+
+            print(f'Topic:   {topic}')
+            print(f'Message: {try_decode(message)}')
+
+        await client.stop()
 
 
 def _do_subscribe(args):

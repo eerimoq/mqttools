@@ -32,15 +32,21 @@ class ClientThread(threading.Thread):
                         self._port,
                         self._client_id,
                         keep_alive_s=self._keep_alive_s,
+                        subscriptions=self._topics,
                         topic_alias_maximum=10)
 
-        await client.start()
-        await asyncio.gather(*[client.subscribe(topic)
-                               for topic in self._topics])
-
         while True:
-            self._queue.put(
-                (time.strftime('%H:%M:%S'), *await client.messages.get()))
+            await client.start()
+
+            while True:
+                topic, message = await client.messages.get()
+
+                if topic is None:
+                    break
+
+                self._queue.put((time.strftime('%H:%M:%S'), topic, message))
+
+            await client.stop()
 
     def run(self):
         asyncio.run(self.main())
