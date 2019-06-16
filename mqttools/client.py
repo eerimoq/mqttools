@@ -270,6 +270,8 @@ class Client(object):
         self._tx_topic_aliases = {}
         self._tx_topic_alias_maximum = 0
         self._registered_broker_topic_aliases = set()
+        self._reader_task = None
+        self._keep_alive_task = None
         self._connack_event = asyncio.Event()
         self._pingresp_event = asyncio.Event()
         self.transactions = {}
@@ -280,18 +282,21 @@ class Client(object):
 
         LOGGER.info('Connecting to %s:%s.', self._host, self._port)
 
-        self._reader, self._writer = await asyncio.open_connection(
-            self._host,
-            self._port,
-            **self._kwargs)
-        self._reader_task = asyncio.create_task(self._reader_main())
+        try:
+            self._reader, self._writer = await asyncio.open_connection(
+                self._host,
+                self._port,
+                **self._kwargs)
 
-        await self.connect(resume_session)
+            self._reader_task = asyncio.create_task(self._reader_main())
 
-        if self._keep_alive_s != 0:
-            self._keep_alive_task = asyncio.create_task(self._keep_alive_main())
-        else:
-            self._keep_alive_task = None
+            await self.connect(resume_session)
+
+            if self._keep_alive_s != 0:
+                self._keep_alive_task = asyncio.create_task(self._keep_alive_main())
+        except Exception:
+            await self.stop()
+            raise
 
     async def stop(self):
         """Try to cleanly disconnect from the broker and then close the TCP
@@ -307,12 +312,13 @@ class Client(object):
         except Exception:
             pass
 
-        self._reader_task.cancel()
+        if self._reader_task is not None:
+            self._reader_task.cancel()
 
-        try:
-            await self._reader_task
-        except Exception:
-            pass
+            try:
+                await self._reader_task
+            except Exception:
+                pass
 
         if self._keep_alive_task is not None:
             self._keep_alive_task.cancel()
@@ -322,7 +328,8 @@ class Client(object):
             except Exception:
                 pass
 
-        self._writer.close()
+        if self._writer is not None:
+            self._writer.close()
 
     async def connect(self, resume_session):
         self._connack_event.clear()
@@ -541,6 +548,8 @@ class Client(object):
 
         """
 
+        LOGGER.info('Reader task starting...')
+
         try:
             await self.reader_loop()
         except Exception as e:
@@ -566,6 +575,8 @@ class Client(object):
         """Ping the broker periodically to keep the connection alive.
 
         """
+
+        LOGGER.info('Keep alive task starting...')
 
         try:
             await self.keep_alive_loop()
