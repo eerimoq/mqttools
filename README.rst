@@ -34,7 +34,7 @@ Limitations:
 There are lots of limitations in both the client and the broker. Here
 are a few of them:
 
-- QoS level 1 and 2 messages are not supprted. A session state storage
+- QoS level 1 and 2 messages are not supported. A session state storage
   is required to do so, both in the client and the broker.
 
 - Authentication is not supported.
