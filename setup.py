@@ -23,6 +23,7 @@ setuptools.setup(
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
     ],
+    keywords=['mqtt'],
     url='https://github.com/eerimoq/mqttools',
     packages=find_packages(exclude=['tests']),
     install_requires=[
