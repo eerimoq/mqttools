@@ -186,21 +186,6 @@ class PropertyIds(enum.IntEnum):
     SHARED_SUBSCRIPTION_AVAILABLE     = 42
 
 
-class QoS(enum.IntEnum):
-    """Quality of service levels.
-
-    """
-
-    AT_MOST_ONCE  = 0
-    "At most once (QoS level 0)."
-
-    AT_LEAST_ONCE = 1
-    "At least once (QoS level 1)."
-
-    EXACTLY_ONCE  = 2
-    "Exactly once (QoS level 2)."
-
-
 # MQTT 5.0
 PROTOCOL_VERSION = 5
 

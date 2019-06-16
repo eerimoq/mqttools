@@ -20,9 +20,6 @@ Functions and classes
 .. autoclass:: mqttools.Broker
     :members:
 
-.. autoclass:: mqttools.QoS
-    :members:
-
 .. autoclass:: mqttools.ConnectError
     :members:
 

@@ -9,7 +9,6 @@ from .common import PropertyIds
 from .common import SubackReasonCode
 from .common import UnsubackReasonCode
 from .common import DisconnectReasonCode
-from .common import QoS
 from .common import pack_connect
 from .common import unpack_connack
 from .common import pack_disconnect
@@ -134,7 +133,7 @@ class Client(object):
                         client_id='my-client',
                         will_topic='/my/last/will',
                         will_message=b'my-last-message',
-                        will_qos=QoS.EXACTLY_ONCE,
+                        will_qos=0,
                         keep_alive_s=600,
                         response_timeout=30',
                         topic_aliases=['/my/topic']',
@@ -150,7 +149,7 @@ class Client(object):
                  client_id=None,
                  will_topic='',
                  will_message=b'',
-                 will_qos=QoS.AT_MOST_ONCE,
+                 will_qos=0,
                  keep_alive_s=60,
                  response_timeout=5,
                  topic_aliases=None,

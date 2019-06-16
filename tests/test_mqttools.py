@@ -10,7 +10,6 @@ from unittest.mock import patch
 from io import StringIO
 
 import mqttools
-from mqttools import QoS
 
 
 HOST = 'localhost'

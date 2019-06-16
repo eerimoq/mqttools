@@ -7,7 +7,7 @@ async def will():
                              1883,
                              will_topic='/my/will/topic',
                              will_message=b'my-will-message',
-                             will_qos=mqttools.QoS.AT_MOST_ONCE)
+                             will_qos=0)
 
     await client.start()
     await client.stop()

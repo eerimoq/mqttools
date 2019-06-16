@@ -13,7 +13,6 @@ from .common import MalformedPacketError
 from .common import TimeoutError
 from .common import SubackReasonCode
 from .common import UnsubackReasonCode
-from .common import QoS
 
 
 def main():
