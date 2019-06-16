@@ -286,12 +286,12 @@ class Client(object):
             **self._kwargs)
         self._reader_task = asyncio.create_task(self._reader_main())
 
+        await self.connect(resume_session)
+
         if self._keep_alive_s != 0:
             self._keep_alive_task = asyncio.create_task(self._keep_alive_main())
         else:
             self._keep_alive_task = None
-
-        await self.connect(resume_session)
 
     async def stop(self):
         """Try to cleanly disconnect from the broker and then close the TCP
