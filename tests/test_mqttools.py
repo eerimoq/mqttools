@@ -402,6 +402,7 @@ class MQTToolsTest(unittest.TestCase):
         client = mqttools.Client(*self.broker.address,
                                  'bar',
                                  topic_alias_maximum=0,
+                                 connect_delays=[],
                                  keep_alive_s=0)
 
         with self.assertRaises(mqttools.ConnectError) as cm:
@@ -490,6 +491,7 @@ class MQTToolsTest(unittest.TestCase):
                                  'bar',
                                  session_expiry_interval=120,
                                  topic_alias_maximum=0,
+                                 connect_delays=[],
                                  keep_alive_s=0)
 
         with self.assertRaises(mqttools.SessionResumeError):

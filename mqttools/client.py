@@ -126,7 +126,8 @@ class Client(object):
     `connect_delays` is a list of delays in seconds between the
     connection attempts in :meth:`start()`. Each delay is used once,
     except the last delay, which is used until successfully
-    connected. If ``None``, only one connection attempt is performed.
+    connected. If ``[]``, only one connection attempt is performed. If
+    ``None``, the default delays ``[1, 2, 4, 8]`` are used.
 
     `kwargs` are passed to ``asyncio.open_connection()``.
 
@@ -148,7 +149,7 @@ class Client(object):
                         topic_alias_maximum=100,
                         session_expiry_interval=1800,
                         subscriptions=['a/b', 'test/#'],
-                        connect_delays=[1, 2, 4, 8],
+                        connect_delays=[1, 2],
                         ssl=True)
 
     """
@@ -197,6 +198,10 @@ class Client(object):
             subscriptions = []
 
         self._subscriptions = subscriptions
+
+        if connect_delays is None:
+            connect_delays = [1, 2, 4, 8]
+
         self._connect_delays = connect_delays
 
         if topic_aliases is None:
@@ -284,35 +289,35 @@ class Client(object):
 
         """
 
+        attempt = 1
         delays = self._connect_delays
 
-        if delays is None:
-            await self._start(resume_session)
-        else:
-            attempt = 1
-
-            while True:
-                try:
-                    await self._start(resume_session)
-                    break
-                except ConnectionRefusedError:
+        while True:
+            try:
+                await self._start(resume_session)
+                break
+            except Exception as e:
+                if isinstance(e, ConnectionRefusedError):
                     LOGGER.info('TCP connect refused.')
-                except mqttools.TimeoutError:
+                elif isinstance(e, TimeoutError):
                     LOGGER.info(
                         'MQTT connect or subscribe acknowledge not received.')
-                except mqttools.ConnectError as e:
+                elif isinstance(e, ConnectError):
                     LOGGER.info('MQTT connect failed with reason %s.', e)
-                except mqttools.SubscribeError as e:
+                elif isinstance(e, SubscribeError):
                     LOGGER.info('MQTT subscribe failed with reason %s.', e)
 
-                # Delay a while before the next connect attempt.
-                delay = delays[min(attempt, len(delays)) - 1]
-                LOGGER.info(
-                    'Waiting %s second(s) before next connection attempt(%d).',
-                    delay,
-                    attempt)
-                await asyncio.sleep(delay)
-                attempt += 1
+                if delays == []:
+                    raise
+
+            # Delay a while before the next connect attempt.
+            delay = delays[min(attempt, len(delays)) - 1]
+            LOGGER.info(
+                'Waiting %s second(s) before next connection attempt(%d).',
+                delay,
+                attempt)
+            await asyncio.sleep(delay)
+            attempt += 1
 
     async def _start(self, resume_session=False):
         self._rx_topic_aliases = {}

@@ -28,6 +28,7 @@ class ClientTest(unittest.TestCase):
             client = mqttools.Client(*listener.sockets[0].getsockname(),
                                      'connack',
                                      response_timeout=0.1,
+                                     connect_delays=[],
                                      topic_alias_maximum=0)
 
             with self.assertRaises(mqttools.TimeoutError):
