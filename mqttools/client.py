@@ -120,6 +120,14 @@ class Client(object):
     seconds. Give as 0 to remove the session in the broker when the
     connection ends.
 
+    `subscriptions` is a list of topics to subscribe to after
+    connected in :meth:`start()`.
+
+    `connect_delays` is a list of delays in seconds between the
+    connection attempts in :meth:`start()`. Each delay is used once,
+    except the last delay, which is used until successfully
+    connected. If ``None``, only one connection attempt is performed.
+
     `kwargs` are passed to ``asyncio.open_connection()``.
 
     Create a client with default configuration:
@@ -139,6 +147,8 @@ class Client(object):
                         topic_aliases=['/my/topic']',
                         topic_alias_maximum=100,
                         session_expiry_interval=1800,
+                        subscriptions=['a/b', 'test/#'],
+                        connect_delays=[1, 2, 4, 8],
                         ssl=True)
 
     """
@@ -155,6 +165,8 @@ class Client(object):
                  topic_aliases=None,
                  topic_alias_maximum=10,
                  session_expiry_interval=0,
+                 subscriptions=None,
+                 connect_delays=None,
                  **kwargs):
         self._host = host
         self._port = port
@@ -180,6 +192,12 @@ class Client(object):
         if session_expiry_interval > 0:
             self._connect_properties[PropertyIds.SESSION_EXPIRY_INTERVAL] = (
                 session_expiry_interval)
+
+        if subscriptions is None:
+            subscriptions = []
+
+        self._subscriptions = subscriptions
+        self._connect_delays = connect_delays
 
         if topic_aliases is None:
             topic_aliases = []
@@ -266,6 +284,37 @@ class Client(object):
 
         """
 
+        delays = self._connect_delays
+
+        if delays is None:
+            await self._start(resume_session)
+        else:
+            attempt = 1
+
+            while True:
+                try:
+                    await self._start(resume_session)
+                    break
+                except ConnectionRefusedError:
+                    LOGGER.info('TCP connect refused.')
+                except mqttools.TimeoutError:
+                    LOGGER.info(
+                        'MQTT connect or subscribe acknowledge not received.')
+                except mqttools.ConnectError as e:
+                    LOGGER.info('MQTT connect failed with reason %s.', e)
+                except mqttools.SubscribeError as e:
+                    LOGGER.info('MQTT subscribe failed with reason %s.', e)
+
+                # Delay a while before the next connect attempt.
+                delay = delays[min(attempt, len(delays)) - 1]
+                LOGGER.info(
+                    'Waiting %s second(s) before next connection attempt(%d).',
+                    delay,
+                    attempt)
+                await asyncio.sleep(delay)
+                attempt += 1
+
+    async def _start(self, resume_session=False):
         self._rx_topic_aliases = {}
         self._tx_topic_aliases = {}
         self._tx_topic_alias_maximum = 0
@@ -294,6 +343,10 @@ class Client(object):
 
             if self._keep_alive_s != 0:
                 self._keep_alive_task = asyncio.create_task(self._keep_alive_main())
+
+            if not resume_session:
+                for topic in self._subscriptions:
+                    await self.subscribe(topic)
         except Exception:
             await self.stop()
             raise

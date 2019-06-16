@@ -1,36 +1,6 @@
 import asyncio
 import mqttools
-
-
-async def connect_and_subscribe(client):
-    """Returns once connected to the broker and subscribed to a topic.
-
-    """
-
-    attempt = 1
-
-    while True:
-        try:
-            await client.start()
-            await client.subscribe('foobar')
-            print('Connected and subscribed.')
-            break
-        except ConnectionRefusedError:
-            print('TCP connect refused.')
-        except mqttools.TimeoutError:
-            print('MQTT connect or subscribe acknowledge not received.')
-        except mqttools.ConnectError as e:
-            print(f'MQTT connect failed with reason {e}.')
-        except mqttools.SubscribeError as e:
-            print(f'MQTT subscribe failed with reason {e}.')
-
-        # Delay a while before the next connect attempt.
-        delays = [1, 2, 4, 8]
-        delay = delays[min(attempt, len(delays)) - 1]
-        print(f'Waiting {delay} second(s) before next connection '
-              f'attempt({attempt}).')
-        await asyncio.sleep(delay)
-        attempt += 1
+import logging
 
 
 async def handle_messages(client):
@@ -44,11 +14,17 @@ async def handle_messages(client):
 
 
 async def reconnector():
-    client = mqttools.Client('localhost', 1883)
+    client = mqttools.Client('localhost',
+                             1883,
+                             subscriptions=['foobar'],
+                             connect_delays=[1, 2, 4, 8])
 
     while True:
-        await connect_and_subscribe(client)
+        await client.start()
         await handle_messages(client)
+        await client.stop()
 
+
+logging.basicConfig(level=logging.INFO)
 
 asyncio.run(reconnector())
