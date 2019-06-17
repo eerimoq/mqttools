@@ -460,8 +460,7 @@ def pack_connect(client_id,
     packed = pack_fixed_header(ControlPacketType.CONNECT,
                                0,
                                10 + payload_length + len(properties))
-    packed += struct.pack('>H', 4)
-    packed += b'MQTT'
+    packed += pack_string('MQTT')
     packed += struct.pack('>BBH',
                           PROTOCOL_VERSION,
                           flags,
@@ -478,9 +477,7 @@ def pack_connect(client_id,
 
 
 def unpack_connect(payload):
-    unpack_u16(payload)
-
-    if payload.read(4) != b'MQTT':
+    if unpack_string(payload) != 'MQTT':
         raise MalformedPacketError('Invalid MQTT magic string.')
 
     if unpack_u8(payload) != PROTOCOL_VERSION:
@@ -506,7 +503,22 @@ def unpack_connect(payload):
     client_id = unpack_string(payload)
 
     if flags & WILL_FLAG:
-        raise MalformedPacketError()
+        will_properties = unpack_properties(
+            'CONNECT-WILL',
+            [
+                PropertyIds.WILL_DELAY_INTERVAL,
+                PropertyIds.PAYLOAD_FORMAT_INDICATOR,
+                PropertyIds.MESSAGE_EXPIRY_INTERVAL,
+                PropertyIds.CONTENT_TYPE,
+                PropertyIds.RESPONSE_TOPIC,
+                PropertyIds.USER_PROPERTY
+            ],
+            payload)
+        will_topic = unpack_string(payload)
+        will_message = unpack_binary(payload)
+    else:
+        will_topic = None
+        will_message = None
 
     if flags & USER_NAME_FLAG:
         user_name = unpack_string(payload)
@@ -518,7 +530,14 @@ def unpack_connect(payload):
     else:
         password = None
 
-    return client_id, clean_start, keep_alive_s, properties, user_name, password
+    return (client_id,
+            clean_start,
+            will_topic,
+            will_message,
+            keep_alive_s,
+            properties,
+            user_name,
+            password)
 
 
 def pack_connack(session_present,
@@ -785,17 +804,21 @@ def format_properties(properties):
 def format_connect(payload):
     (client_id,
      clean_start,
+     will_topic,
+     will_message,
      keep_alive_s,
      properties,
      user_name,
      password) = unpack_connect(payload)
 
     return [
-        f'  ClientId:   {client_id}',
-        f'  CleanStart: {clean_start}',
-        f'  KeepAlive:  {keep_alive_s}',
-        f'  UserName:   {user_name}',
-        f'  Password:   {password}'
+        f'  ClientId:    {client_id}',
+        f'  CleanStart:  {clean_start}',
+        f'  WillTopic:   {will_topic}',
+        f'  WillMessage: {will_message}',
+        f'  KeepAlive:   {keep_alive_s}',
+        f'  UserName:    {user_name}',
+        f'  Password:    {password}'
     ] + format_properties(properties)
 
 

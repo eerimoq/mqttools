@@ -54,6 +54,8 @@ class Session(object):
         self.expiry_time = None
         self.client = None
         self.maximum_packet_size = MAXIMUM_PACKET_SIZE
+        self.will_topic = None
+        self.will_message = None
 
     def clean(self):
         self.subscriptions = set()
@@ -61,6 +63,8 @@ class Session(object):
         self.expiry_time = None
         self.client = None
         self.maximum_packet_size = MAXIMUM_PACKET_SIZE
+        self.will_topic = None
+        self.will_message = None
 
 
 def is_wildcards_in_topic(topic):
@@ -102,7 +106,8 @@ class Client(object):
             elif isinstance(e, ProtocolError):
                 self._disconnect_reason = DisconnectReasonCode.PROTOCOL_ERROR
 
-            self.disconnect()
+            if self._session is not None:
+                self.disconnect()
 
         if self._session is not None:
             self._session.client = None
@@ -150,6 +155,8 @@ class Client(object):
     def on_connect(self, payload):
         (client_id,
          clean_start,
+         will_topic,
+         will_message,
          keep_alive_s,
          properties,
          user_name,
@@ -174,6 +181,9 @@ class Client(object):
         if PropertyIds.MAXIMUM_PACKET_SIZE in properties:
             maximum_packet_size = properties[PropertyIds.MAXIMUM_PACKET_SIZE]
             self._session.maximum_packet_size = maximum_packet_size
+
+        self._session.will_topic = will_topic
+        self._session.will_message = will_message
 
         if (user_name is not None) or (password is not None):
             reason = ConnectReasonCode.BAD_USER_NAME_OR_PASSWORD

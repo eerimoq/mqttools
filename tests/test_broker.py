@@ -900,6 +900,34 @@ class BrokerTest(unittest.TestCase):
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
 
+    def test_publish_will(self):
+        asyncio.run(self.publish_will())
+
+    async def publish_will(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Connect with will topic 'foo' and message 'bar'.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = (
+                b'\x10\x1a\x00\x04MQTT\x05\x06\x00\x00\x00\x00\x02id\x00\x00'
+                b'\x03foo\x00\x03bar')
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # ToDo: Verify that the will is published when the client
+            # is lost.
+
+            writer_1.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
 
 logging.basicConfig(level=logging.DEBUG)
 
