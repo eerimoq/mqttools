@@ -20,8 +20,23 @@ def create_message_bytes(message, size, number, fmt):
     return message_bytes
 
 
-async def publisher(host, port, client_id, count, size, topic, message):
-    client = Client(host, port, client_id)
+async def publisher(host,
+                    port,
+                    client_id,
+                    count,
+                    size,
+                    will_topic,
+                    will_message,
+                    topic,
+                    message):
+    if will_message is not None:
+        will_message = will_message.encode('utf-8')
+
+    client = Client(host,
+                    port,
+                    client_id,
+                    will_topic=will_topic,
+                    will_message=will_message)
 
     print(f"Connecting to '{host}:{port}'.")
     print()
@@ -47,6 +62,8 @@ def _do_publish(args):
                           args.client_id,
                           args.count,
                           args.size,
+                          args.will_topic,
+                          args.will_message,
                           args.topic,
                           args.message))
 
@@ -73,6 +90,8 @@ def add_subparser(subparsers):
         type=int,
         default=10,
         help='Generated message size (default: %(default)s).')
+    subparser.add_argument('--will-topic', help='Will topic.')
+    subparser.add_argument('--will-message', help='Will message.')
     subparser.add_argument('topic', help='Topic to publish.')
     subparser.add_argument(
         'message',

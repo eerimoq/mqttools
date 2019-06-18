@@ -112,6 +112,11 @@ class Client(object):
         if self._session is not None:
             self._session.client = None
 
+            # ToDo: Should not publish on normal disconnection.
+            if self._session.will_topic is not None:
+                self._broker.publish(self._session.will_topic,
+                                     self._session.will_message)
+
         self.log_info('Closing client %r.', addr)
 
     async def reader_loop(self):
@@ -209,8 +214,7 @@ class Client(object):
         if is_wildcards_in_topic(topic):
             raise MalformedPacketError(f'Invalid topic {topic} in publish.')
 
-        for session in self._broker.iter_subscribers(topic):
-            session.client.publish(topic, message)
+        self._broker.publish(topic, message)
 
     def on_subscribe(self, payload):
         packet_identifier, _, subscriptions = unpack_subscribe(payload)
@@ -393,3 +397,11 @@ class Broker(object):
             self._sessions[client_id] = session
 
         return session, session_present
+
+    def publish(self, topic, message):
+        """Publish given topic and message to all subscribers.
+
+        """
+
+        for session in self.iter_subscribers(topic):
+            session.client.publish(topic, message)
