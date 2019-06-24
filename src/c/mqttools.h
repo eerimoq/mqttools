@@ -32,37 +32,56 @@
 /* Error codes. */
 #define MQTTOOLS_OK                             0
 #define MQTTOOLS_SESSION_RESUME                 1
+#define MQTTOOLS_DISCONNECTED                   2
 
 struct mqttools_client_t {
     const char *host_p;
     int port;
     const char *client_id_p;
-    const char *will_topic_p;
-    const uint8_t *will_message_p;
-    int will_qos;
+    struct {
+        const char *topic_p;
+        const uint8_t *message_p;
+        size_t message_size;
+        int qos;
+    } will;
     int keep_alive_s;
     int response_timeout;
     int topic_aliases;
     int topic_alias_maximum;
     int session_expiry_interval;
     const char **subscriptions_pp;
-    int connect_delays;
+    int *connect_delays_p;
 };
 
 void mqttools_client_init(struct mqttools_client_t *self_p,
                           const char *host_p,
-                          int port,
-                          const char *client_id_p,
-                          const char *will_topic_p,
-                          const uint8_t *will_message_p,
-                          int will_qos,
-                          int keep_alive_s,
-                          int response_timeout,
-                          const char **topic_aliases_pp,
-                          int topic_alias_maximum,
-                          int session_expiry_interval,
-                          const char **subscriptions_pp,
-                          int *connect_delays_p);
+                          int port);
+
+void mqttools_client_set_client_id(struct mqttools_client_t *self_p,
+                                   const char *client_id_p);
+
+void mqttools_client_set_will(struct mqttools_client_t *self_p,
+                              const char *topic_p,
+                              const uint8_t *message_p,
+                              int qos);
+
+void mqttools_client_set_response_timeout(struct mqttools_client_t *self_p,
+                                          int response_timeout);
+
+void mqttools_client_set_topic_aliases(struct mqttools_client_t *self_p,
+                                       const char **topic_aliases_pp);
+
+void mqttools_client_set_topic_alias_maximum(struct mqttools_client_t *self_p,
+                                             int topic_alias_maximum);
+
+void mqttools_client_set_session_expiry_interval(struct mqttools_client_t *self_p,
+                                                 int session_expiry_interval);
+
+void mqttools_client_set_subscriptions(struct mqttools_client_t *self_p,
+                                       const char **subscriptions_pp);
+
+void mqttools_client_set_connect_delays(struct mqttools_client_t *self_p,
+                                        int *connect_delays_p);
 
 int mqttools_client_start(struct mqttools_client_t *self_p,
                           bool resume_session);
@@ -78,5 +97,11 @@ int mqttools_client_unsubscribe(struct mqttools_client_t *self_p,
 int mqttools_client_publish(struct mqttools_client_t *self_p,
                             const char *topic_p,
                             const uint8_t *message_p);
+
+ssize_t mqttools_client_read_message(struct mqttools_client_t *self_p,
+                                     char *topic_p,
+                                     size_t topic_size,
+                                     uint8_t *message_p,
+                                     size_t message_size);
 
 #endif

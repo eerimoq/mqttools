@@ -273,19 +273,78 @@ static void *main(void *arg_p)
 
 void mqttools_client_init(struct mqttools_client_t *self_p,
                           const char *host_p,
-                          int port,
-                          const char *client_id_p,
-                          const char *will_topic_p,
-                          const uint8_t *will_message_p,
-                          int will_qos,
-                          int keep_alive_s,
-                          int response_timeout,
-                          const char **topic_aliases_pp,
-                          int topic_alias_maximum,
-                          int session_expiry_interval,
-                          const char **subscriptions_pp,
-                          int *connect_delays_p)
+                          int port)
 {
+    static int default_connect_delays[] = { 1, 2, 4, 8 };
+
+    self_p->host_p = host_p;
+    self_p->port = port;
+    self_p->client_id_p = NULL;
+    self_p->will.topic_p = NULL;
+    self_p->will.message_p = NULL;
+    self_p->will.message_size = 0;
+    self_p->will.qos = 0;
+    self_p->response_timeout = 5;
+    self_p->topic_aliases_pp = NULL;
+    self_p->topic_alias_maximum = 10;
+    self_p->session_expiry_interval = 0;
+    self_p->subscriptions_pp = NULL;
+    self_p->connect_delays_p = &default_connect_delays[0];
+    self_p->connect_delays_length = 4;
+}
+
+void mqttools_client_set_client_id(struct mqttools_client_t *self_p,
+                                   const char *client_id_p)
+{
+    self_p->client_id_p = client_id_p;
+}
+
+void mqttools_client_set_will(struct mqttools_client_t *self_p,
+                              const char *topic_p,
+                              const uint8_t *message_p,
+                              int qos)
+{
+    self_p->will.topic_p = topic_p;
+    self_p->will.message_p = message_p;
+    self_p->will.qos = qos;
+}
+
+void mqttools_client_set_response_timeout(struct mqttools_client_t *self_p,
+                                          int value)
+{
+    self_p->response_timeout = value;
+}
+
+void mqttools_client_set_topic_aliases(struct mqttools_client_t *self_p,
+                                       const char **topic_aliases_pp)
+{
+    self_p->topic_aliases_pp = topic_aliases_pp;
+}
+
+void mqttools_client_set_topic_alias_maximum(struct mqttools_client_t *self_p,
+                                             int value)
+{
+    self_p->topic_alias_maximum = value;
+}
+
+void mqttools_client_set_session_expiry_interval(struct mqttools_client_t *self_p,
+                                                 int value)
+{
+    self_p->session_expiry_interval = value;
+}
+
+void mqttools_client_set_subscriptions(struct mqttools_client_t *self_p,
+                                       const char **values_pp)
+{
+    self_p->subscriptions_pp = values_pp;
+}
+
+void mqttools_client_set_connect_delays(struct mqttools_client_t *self_p,
+                                        int *values_p,
+                                        int length)
+{
+    self_p->connect_delays_p = connect_delays_p;
+    self_p->connect_delays_length = length;
 }
 
 int mqttools_client_start(struct mqttools_client_t *self_p,
