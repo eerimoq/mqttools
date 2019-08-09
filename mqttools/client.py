@@ -257,6 +257,14 @@ class Client(object):
 
         return self._messages
 
+    async def on_message(self, topic, message):
+        """Called for each received MQTT message. Puts the message on the
+        messages queue by default.
+
+        """
+
+        await self._messages.put((topic, message))
+
     async def start(self, resume_session=False):
         """Open a TCP connection to the broker and perform the MQTT connect
         procedure. This method must be called before any
@@ -550,7 +558,7 @@ class Client(object):
                              alias)
                 return
 
-        await self._messages.put((topic, message))
+        await self.on_message(topic, message)
 
     def on_suback(self, payload):
         packet_identifier, properties, reasons = unpack_suback(payload)
@@ -692,4 +700,74 @@ class Client(object):
     async def _close(self):
         self.disconnect()
         self._writer.close()
-        await self._messages.put((None, None))
+        await self.on_message(None, None)
+
+
+class ClientThreadAsync(Client):
+
+    def __init__(self, client_thread):
+        self._client_thread = client_thread
+
+    async def on_message(self, topic, message):
+        self._client_thread.on_message(topic, message)
+
+
+class ClientThread(threading.Thread):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._client = Client(*args, *kwargs)
+        self._actions = queue.Queue()
+        self._results = queue.Queue()
+        self._messages = queue.Queue()
+
+    @property
+    def messages(self):
+        return self._messages
+
+    def run(self):
+        while True:
+            action, args = self._queue.get()
+
+            try:
+                if action == 'start':
+                    await self._client.start(*args)
+                elif action == 'stop':
+                    await self._client.stop(*args)
+                elif action == 'subscribe':
+                    await self._client.subscribe(*args)
+                elif action == 'unsubscribe':
+                    await self._client.unsubscribe(*args)
+                elif action == 'publish':
+                    await self._client.publish(*args)
+
+                exception = None
+            except Exception as e:
+                exception = e
+
+            self._results.put(exception)
+
+    def on_message(self, topic, message):
+        self._messages.put((topic, message))
+
+    def _exec(self, action, *args):
+        self._actions.put((action, args))
+        exception = self._results.get()
+
+        if exception is not None:
+            raise exception
+
+    def start(self, resume_session=False):
+        return self._exec('start', resume_session)
+
+    def stop(self):
+        return self._exec('stop')
+
+    def subscribe(self, topic):
+        return self._exec('subscribe', topic)
+
+    def unsubscribe(self, topic):
+        return self._exec('unsubscribe', topic)
+
+    def publish(self, topic, message):
+        return self._exec('publish', topic, message)
