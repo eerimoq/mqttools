@@ -258,8 +258,9 @@ class Client(object):
         return self._messages
 
     async def on_message(self, topic, message):
-        """Called for each received MQTT message. Puts the message on the
-        messages queue by default.
+        """Called for each received MQTT message and when the broker
+        connection is lost. Puts the message on the messages queue by
+        default.
 
         """
 
