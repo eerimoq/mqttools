@@ -257,6 +257,14 @@ class Client(object):
 
         return self._messages
 
+    async def on_message(self, topic, message):
+        """Called for each received MQTT message. Puts the message on the
+        messages queue by default.
+
+        """
+
+        await self._messages.put((topic, message))
+
     async def start(self, resume_session=False):
         """Open a TCP connection to the broker and perform the MQTT connect
         procedure. This method must be called before any
@@ -550,7 +558,7 @@ class Client(object):
                              alias)
                 return
 
-        await self._messages.put((topic, message))
+        await self.on_message(topic, message)
 
     def on_suback(self, payload):
         packet_identifier, properties, reasons = unpack_suback(payload)
@@ -692,4 +700,4 @@ class Client(object):
     async def _close(self):
         self.disconnect()
         self._writer.close()
-        await self._messages.put((None, None))
+        await self.on_message(None, None)
