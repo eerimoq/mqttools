@@ -73,9 +73,9 @@ messages are printed to standard output.
    Connecting to 'localhost:1883'.
 
    Topic:   /test
-   Message: 11
+   Message: 3131
    Topic:   /test/mqttools/foo
-   Message: bar
+   Message: 626172
 
 Publish
 ^^^^^^^
@@ -84,7 +84,7 @@ Connect to given MQTT broker and publish a message to a topic.
 
 .. code-block:: text
 
-   $ mqttools publish /test/mqttools/foo bar
+   $ mqttools publish /test/mqttools/foo 626172
    Connecting to 'localhost:1883'.
 
    Published 1 message(s) in 0 seconds from 1 concurrent task(s).
