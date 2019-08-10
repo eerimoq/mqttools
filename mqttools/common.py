@@ -3,7 +3,7 @@ import struct
 import enum
 from io import BytesIO
 import bitstruct
-from binascii import hexlify
+import binascii
 
 
 # Connection flags.
@@ -14,6 +14,10 @@ WILL_QOS_2     = 0x10
 WILL_RETAIN    = 0x20
 PASSWORD_FLAG  = 0x40
 USER_NAME_FLAG = 0x80
+
+
+def hexlify(data):
+    return binascii.hexlify(data).decode('ascii').upper()
 
 
 # Control packet types.
@@ -781,7 +785,7 @@ def format_connect(payload):
         f'  ClientId:    {client_id}',
         f'  CleanStart:  {clean_start}',
         f'  WillTopic:   {will_topic}',
-        f'  WillMessage: {will_message}',
+        f'  WillMessage: {hexlify(will_message)}',
         f'  KeepAlive:   {keep_alive_s}',
         f'  UserName:    {user_name}',
         f'  Password:    {password}'
@@ -808,7 +812,7 @@ def format_publish(flags, payload):
         f'  QoSLevel:   {qos}',
         f'  Retain:     {retain}',
         f'  Topic:      {topic}',
-        f'  Message:    {message}',
+        f'  Message:    {hexlify(message)}',
         '  Properties:'
     ] + format_properties(properties)
 

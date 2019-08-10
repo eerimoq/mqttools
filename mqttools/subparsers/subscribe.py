@@ -1,7 +1,7 @@
 import asyncio
 
 from ..client import Client
-from . import try_decode
+from ..common import hexlify
 
 
 async def subscriber(host, port, client_id, topic, keep_alive_s):
@@ -25,7 +25,7 @@ async def subscriber(host, port, client_id, topic, keep_alive_s):
                 break
 
             print(f'Topic:   {topic}')
-            print(f'Message: {try_decode(message)}')
+            print(f'Message: {hexlify(message)}')
 
         await client.stop()
 
@@ -42,7 +42,7 @@ def add_subparser(subparsers):
     subparser = subparsers.add_parser('subscribe',
                                       description='Subscribe for given topic.')
     subparser.add_argument('--host',
-                           default='broker.hivemq.com',
+                           default='localhost',
                            help='Broker host (default: %(default)s).')
     subparser.add_argument('--port',
                            type=int,

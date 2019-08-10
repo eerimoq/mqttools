@@ -1,11 +1,20 @@
 import asyncio
 import time
+import binascii
 from humanfriendly import format_timespan
 
 from ..client import Client
+from ..common import Error
 
 
-def create_message_bytes(message, size, number, fmt):
+def encode_message(message):
+    try:
+        return binascii.unhexlify(message)
+    except ValueError:
+        raise Error(f"Invalid hex string '{message}'.")
+
+
+def create_message(message, size, number, fmt):
     if message is None:
         message_bytes = fmt.format(number).encode('ascii')
         extra = (size - len(message_bytes))
@@ -15,7 +24,7 @@ def create_message_bytes(message, size, number, fmt):
         else:
             message_bytes = message_bytes[:size]
     else:
-        message_bytes = message.encode('ascii')
+        message_bytes = encode_message(message)
 
     return message_bytes
 
@@ -30,7 +39,7 @@ async def publisher(host,
                     topic,
                     message):
     if will_message is not None:
-        will_message = will_message.encode('utf-8')
+        will_message = encode_message(will_message)
 
     client = Client(host,
                     port,
@@ -47,7 +56,7 @@ async def publisher(host,
     start_time = time.time()
 
     for number in range(count):
-        message_bytes = create_message_bytes(message, size, number, fmt)
+        message_bytes = create_message(message, size, number, fmt)
         client.publish(topic, message_bytes)
 
     elapsed_time = format_timespan(time.time() - start_time)
@@ -72,7 +81,7 @@ def add_subparser(subparsers):
     subparser = subparsers.add_parser('publish',
                                       description='Publish given topic.')
     subparser.add_argument('--host',
-                           default='broker.hivemq.com',
+                           default='localhost',
                            help='Broker host (default: %(default)s).')
     subparser.add_argument('--port',
                            type=int,

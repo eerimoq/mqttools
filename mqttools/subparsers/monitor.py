@@ -10,6 +10,7 @@ from queue import Queue
 from queue import Empty as QueueEmpty
 
 from ..client import Client
+from ..common import hexlify
 
 
 class QuitError(Exception):
@@ -160,17 +161,10 @@ class Monitor(object):
 
         lines = []
         row_length = max(1, self._ncols - 12)
+        message = hexlify(message)
 
-        try:
-            message = message.decode('utf-8')
-
-            for line in message.splitlines():
-                lines.extend(textwrap.wrap(line, row_length))
-        except UnicodeDecodeError:
-            message = str(message)
-
-            for i in range(0, len(message), row_length):
-                lines.append(message[i:i + row_length])
+        for i in range(0, len(message), row_length):
+            lines.append(message[i:i + row_length])
 
         formatted = [' {}  {}'.format(timestamp, topic)]
         formatted += [11 * ' ' + line for line in lines]
@@ -225,7 +219,7 @@ def add_subparser(subparsers):
     subparser = subparsers.add_parser('monitor',
                                       description='Monitor given topics.')
     subparser.add_argument('--host',
-                           default='broker.hivemq.com',
+                           default='localhost',
                            help='Broker host (default: %(default)s).')
     subparser.add_argument('--port',
                            type=int,

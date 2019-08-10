@@ -232,7 +232,7 @@ class MQTToolsTest(unittest.TestCase):
             '--port', str(self.broker.address[1]),
             '--client-id', 'mqttools_publish',
             '/a/b',
-            'apa'
+            '617061'
         ]
 
         stdout = StringIO()

@@ -70,7 +70,7 @@ messages are printed to standard output.
 .. code-block:: text
 
    $ mqttools subscribe /test/#
-   Connecting to 'broker.hivemq.com:1883'.
+   Connecting to 'localhost:1883'.
 
    Topic:   /test
    Message: 11
@@ -85,7 +85,7 @@ Connect to given MQTT broker and publish a message to a topic.
 .. code-block:: text
 
    $ mqttools publish /test/mqttools/foo bar
-   Connecting to 'broker.hivemq.com:1883'.
+   Connecting to 'localhost:1883'.
 
    Published 1 message(s) in 0 seconds from 1 concurrent task(s).
 
@@ -95,7 +95,7 @@ benchmark the client and the broker.
 .. code-block:: text
 
    $ mqttools publish --count 100 /test/mqttools/foo
-   Connecting to 'broker.hivemq.com:1883'.
+   Connecting to 'localhost:1883'.
 
    Published 100 message(s) in 0.39 seconds from 10 concurrent task(s).
 
@@ -142,7 +142,7 @@ An example connecting to an MQTT broker, subscribing to the topic
    import mqttools
 
    async def subscriber():
-       client = mqttools.Client('broker.hivemq.com', 1883)
+       client = mqttools.Client('localhost', 1883)
 
        await client.start()
        await client.subscribe('/test/#')
@@ -171,7 +171,7 @@ An example connecting to an MQTT broker and publishing the message
    import mqttools
 
    async def publisher():
-       client = mqttools.Client('broker.hivemq.com', 1883)
+       client = mqttools.Client('localhost', 1883)
 
        await client.start()
        client.publish('/test/mqttools/foo', b'bar')
