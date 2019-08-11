@@ -17,7 +17,10 @@ USER_NAME_FLAG = 0x80
 
 
 def hexlify(data):
-    return binascii.hexlify(data).decode('ascii').upper()
+    if data is None:
+        return None
+    else:
+        return binascii.hexlify(data).decode('ascii').upper()
 
 
 # Control packet types.
@@ -908,7 +911,7 @@ def format_packet(prefix, packet):
             lines += format_unsuback(payload)
         elif packet_kind == 'DISCONNECT':
             lines += format_disconnect(payload)
-    except Exception:
-        lines.append('  *** Malformed packet ***')
+    except Exception as e:
+        lines.append(f'  *** Malformed packet ({e}) ***')
 
     return lines

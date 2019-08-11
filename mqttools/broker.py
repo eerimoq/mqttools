@@ -51,7 +51,7 @@ class Session(object):
         self.client_id = client_id
         self.subscriptions = set()
         self.wildcard_subscriptions = set()
-        self.expiry_time = None
+        self.expiry_interval = 0
         self.client = None
         self.maximum_packet_size = MAXIMUM_PACKET_SIZE
         self.will_topic = None
@@ -60,7 +60,7 @@ class Session(object):
     def clean(self):
         self.subscriptions = set()
         self.wildcard_subscriptions = set()
-        self.expiry_time = None
+        self.expiry_interval = 0
         self.client = None
         self.maximum_packet_size = MAXIMUM_PACKET_SIZE
         self.will_topic = None
@@ -116,6 +116,9 @@ class Client(object):
             if self._session.will_topic is not None:
                 self._broker.publish(self._session.will_topic,
                                      self._session.will_message)
+
+            if self._session.expiry_interval == 0:
+                self._broker.remove_session(self._session.client_id)
 
         self.log_info('Closing client %r.', addr)
 
@@ -189,6 +192,10 @@ class Client(object):
 
         self._session.will_topic = will_topic
         self._session.will_message = will_message
+
+        if PropertyIds.SESSION_EXPIRY_INTERVAL in properties:
+            session_expiry_interval = properties[PropertyIds.SESSION_EXPIRY_INTERVAL]
+            self._session.expiry_interval = session_expiry_interval
 
         if (user_name is not None) or (password is not None):
             reason = ConnectReasonCode.BAD_USER_NAME_OR_PASSWORD
@@ -397,6 +404,9 @@ class Broker(object):
             self._sessions[client_id] = session
 
         return session, session_present
+
+    def remove_session(self, client_id):
+        del self._sessions[client_id]
 
     def publish(self, topic, message):
         """Publish given topic and message to all subscribers.

@@ -4,7 +4,7 @@ from uuid import uuid1
 
 
 async def resume_session():
-    client = mqttools.Client('broker.hivemq.com',
+    client = mqttools.Client('localhost',
                              1883,
                              client_id='mqttools-{}'.format(uuid1().node),
                              session_expiry_interval=15)

@@ -117,8 +117,9 @@ class Client(object):
     client is willing to assign on request from the broker.
 
     `session_expiry_interval` is the session expiry time in
-    seconds. Give as 0 to remove the session in the broker when the
-    connection ends.
+    seconds. Give as 0 to remove the session when the connection
+    ends. Give as 0xffffffff to never remove the session (given that
+    the broker supports it).
 
     `subscriptions` is a list of topics to subscribe to after
     connected in :meth:`start()`.
@@ -229,7 +230,7 @@ class Client(object):
         if keep_alive_s == 0:
             self._ping_period_s = None
         else:
-            self._ping_period_s = max(1, keep_alive_s - response_timeout - 1)
+            self._ping_period_s = keep_alive_s
 
     @property
     def client_id(self):
@@ -311,6 +312,8 @@ class Client(object):
             try:
                 await self._start(resume_session)
                 break
+            except SessionResumeError:
+                raise
             except Exception as e:
                 if isinstance(e, ConnectionRefusedError):
                     LOGGER.info('TCP connect refused.')
@@ -359,17 +362,22 @@ class Client(object):
 
             self._reader_task = asyncio.create_task(self._reader_main())
 
-            await self.connect(resume_session)
+            session_present = await self.connect(resume_session)
 
             if self._keep_alive_s != 0:
                 self._keep_alive_task = asyncio.create_task(self._keep_alive_main())
 
-            if not resume_session:
+            if not resume_session or not session_present:
                 for topic in self._subscriptions:
                     await self.subscribe(topic)
         except Exception:
             await self.stop()
             raise
+
+        if resume_session and not session_present:
+            LOGGER.info('No session to resume.')
+
+            raise SessionResumeError('No session to resume.')
 
     async def stop(self):
         """Try to cleanly disconnect from the broker and then close the TCP
@@ -444,10 +452,7 @@ class Client(object):
             if alias < self._tx_topic_alias_maximum + 1
         }
 
-        if resume_session and not session_present:
-            LOGGER.info('No session to resume.')
-
-            raise SessionResumeError('No session to resume.')
+        return session_present
 
     def disconnect(self):
         if self._disconnect_reason is None:

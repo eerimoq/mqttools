@@ -3,7 +3,7 @@ import mqttools
 
 
 async def publish_to_self():
-    client = mqttools.Client('broker.hivemq.com', 1883)
+    client = mqttools.Client('localhost', 1883)
 
     await client.start()
     await client.subscribe('/test/mqttools/foo')

@@ -621,9 +621,28 @@ class BrokerTest(unittest.TestCase):
         async def tester():
             address = await broker.getsockname()
 
-            # Try to resume a session that does not exist.
+            # Try to resume a session that does not exist. A new
+            # session should be created and immediately removed when
+            # the connetion ends as the expiry interval is 0 (not
+            # given).
             reader_1, writer_1 = await asyncio.open_connection(*address)
-            connect = b'\x10\x10\x00\x04MQTT\x05\x00\x00\x00\x00\x00\x03res'
+            connect = (b'\x10\x10\x00\x04MQTT\x05\x00\x00\x00\x00\x00\x03res')
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x0a\x00\x01\x00\x00\x04/a/b\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+            writer_1.close()
+
+            # Try to resume a session that does not exist. A new
+            # session should be created.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = (b'\x10\x15\x00\x04MQTT\x05\x00\x00\x00\x05\x11\xff\xff'
+                       b'\xff\xff\x00\x03res')
             writer_1.write(connect)
             connack = await reader_1.readexactly(13)
             self.assertEqual(
@@ -637,7 +656,8 @@ class BrokerTest(unittest.TestCase):
 
             # Resume the session.
             reader_1, writer_1 = await asyncio.open_connection(*address)
-            connect = b'\x10\x10\x00\x04MQTT\x05\x00\x00\x00\x00\x00\x03res'
+            connect = (b'\x10\x15\x00\x04MQTT\x05\x00\x00\x00\x05\x11\xff\xff'
+                       b'\xff\xff\x00\x03res')
             writer_1.write(connect)
             connack = await reader_1.readexactly(13)
             self.assertEqual(

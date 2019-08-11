@@ -2,13 +2,20 @@ import asyncio
 
 from ..client import Client
 from ..common import hexlify
+from . import to_int
 
 
-async def subscriber(host, port, client_id, topic, keep_alive_s):
+async def subscriber(host,
+                     port,
+                     client_id,
+                     topic,
+                     keep_alive_s,
+                     session_expiry_interval):
     client = Client(host,
                     port,
                     client_id,
                     keep_alive_s=keep_alive_s,
+                    session_expiry_interval=session_expiry_interval,
                     subscriptions=[topic],
                     topic_alias_maximum=10)
 
@@ -35,7 +42,8 @@ def _do_subscribe(args):
                            args.port,
                            args.client_id,
                            args.topic,
-                           args.keep_alive))
+                           args.keep_alive,
+                           args.session_expiry_interval))
 
 
 def add_subparser(subparsers):
@@ -56,5 +64,10 @@ def add_subparser(subparsers):
                            help=('Keep alive time in seconds (default: '
                                  '%(default)s). Give as 0 to disable keep '
                                  'alive.'))
+    subparser.add_argument(
+        '--session-expiry-interval',
+        default=0,
+        type=to_int,
+        help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
     subparser.add_argument('topic', help='Topic to subscribe for.')
     subparser.set_defaults(func=_do_subscribe)

@@ -3,7 +3,7 @@ import mqttools
 
 
 async def will():
-    client = mqttools.Client('broker.hivemq.com',
+    client = mqttools.Client('localhost',
                              1883,
                              will_topic='/my/will/topic',
                              will_message=b'my-will-message',

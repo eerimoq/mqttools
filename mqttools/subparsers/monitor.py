@@ -11,6 +11,7 @@ from queue import Empty as QueueEmpty
 
 from ..client import Client
 from ..common import hexlify
+from . import to_int
 
 
 class QuitError(Exception):
@@ -26,6 +27,7 @@ class ClientThread(threading.Thread):
         self._port = args.port
         self._client_id = args.client_id
         self._keep_alive_s = args.keep_alive
+        self._session_expiry_interval = args.session_expiry_interval
         self._topics = args.subscribe
 
     async def main(self):
@@ -33,6 +35,7 @@ class ClientThread(threading.Thread):
                         self._port,
                         self._client_id,
                         keep_alive_s=self._keep_alive_s,
+                        session_expiry_interval=self._session_expiry_interval,
                         subscriptions=self._topics,
                         topic_alias_maximum=10)
 
@@ -233,6 +236,11 @@ def add_subparser(subparsers):
                            help=('Keep alive time in seconds (default: '
                                  '%(default)s). Give as 0 to disable keep '
                                  'alive.'))
+    subparser.add_argument(
+        '--session-expiry-interval',
+        default=0,
+        type=to_int,
+        help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
     subparser.add_argument(
         'subscribe',
         nargs='*',

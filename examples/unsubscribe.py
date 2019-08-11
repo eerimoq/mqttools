@@ -3,7 +3,7 @@ import mqttools
 
 
 async def unsubscriber():
-    client = mqttools.Client('broker.hivemq.com',
+    client = mqttools.Client('localhost',
                              1883,
                              keep_alive_s=5)
 

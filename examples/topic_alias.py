@@ -3,7 +3,7 @@ import mqttools
 
 
 async def publisher():
-    client = mqttools.Client('broker.hivemq.com',
+    client = mqttools.Client('localhost',
                              1883,
                              topic_aliases=[
                                  '/test/mqttools/foo'

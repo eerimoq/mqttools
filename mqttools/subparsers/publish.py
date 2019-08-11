@@ -5,6 +5,7 @@ from humanfriendly import format_timespan
 
 from ..client import Client
 from ..common import Error
+from . import to_int
 
 
 def encode_message(message):
@@ -36,6 +37,7 @@ async def publisher(host,
                     size,
                     will_topic,
                     will_message,
+                    session_expiry_interval,
                     topic,
                     message):
     if will_message is not None:
@@ -45,7 +47,8 @@ async def publisher(host,
                     port,
                     client_id,
                     will_topic=will_topic,
-                    will_message=will_message)
+                    will_message=will_message,
+                    session_expiry_interval=session_expiry_interval)
 
     print(f"Connecting to '{host}:{port}'.")
     print()
@@ -73,6 +76,7 @@ def _do_publish(args):
                           args.size,
                           args.will_topic,
                           args.will_message,
+                          args.session_expiry_interval,
                           args.topic,
                           args.message))
 
@@ -101,6 +105,11 @@ def add_subparser(subparsers):
         help='Generated message size (default: %(default)s).')
     subparser.add_argument('--will-topic', help='Will topic.')
     subparser.add_argument('--will-message', help='Will message.')
+    subparser.add_argument(
+        '--session-expiry-interval',
+        default=0,
+        type=to_int,
+        help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
     subparser.add_argument('topic', help='Topic to publish.')
     subparser.add_argument(
         'message',
