@@ -309,11 +309,14 @@ class Broker(object):
 
     `host` and `port` are the host and port to listen for clients on.
 
+    `kwargs` are passed to ``asyncio.start_server()``.
+
     """
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, **kwargs):
         self._host = host
         self._port = port
+        self._kwargs = kwargs
         self._sessions = {}
         self._subscribers = defaultdict(list)
         self._wildcard_subscribers = []
@@ -333,7 +336,8 @@ class Broker(object):
 
         self._listener = await asyncio.start_server(self.serve_client,
                                                     self._host,
-                                                    self._port)
+                                                    self._port,
+                                                    **self._kwargs)
         self._listener_ready.set()
         listener_address = self._listener.sockets[0].getsockname()
 

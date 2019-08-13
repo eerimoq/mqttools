@@ -1,16 +1,26 @@
-import sys
-import threading
 import asyncio
-import re
-import time
-import bisect
+import ssl
 
 from ..broker import Broker
 
 
 def _do_broker(args):
     print(f"Starting a broker at '{args.host}:{args.port}'.")
-    broker = Broker(args.host, args.port)
+
+    if all([args.cafile, args.certfile, args.keyfile]):
+        print(f"Certfile: '{args.certfile}'")
+        print(f"Keyfile:  '{args.keyfile}'")
+        print(f"CA File:  '{args.cafile}'")
+        print(f"Check hostname: {not args.no_check_hostname}")
+
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH,
+                                                 cafile=args.cafile)
+        ssl_context.check_hostname = not args.no_check_hostname
+        ssl_context.load_cert_chain(certfile=args.certfile, keyfile=args.keyfile)
+    else:
+        ssl_context = None
+
+    broker = Broker(args.host, args.port, ssl=ssl_context)
     asyncio.run(broker.serve_forever())
 
 
@@ -24,4 +34,20 @@ def add_subparser(subparsers):
                            type=int,
                            default=1883,
                            help='Broker port (default: %(default)s).')
+    subparser.add_argument(
+        '--cafile',
+        default='',
+        help='MQTT broker CA file.')
+    subparser.add_argument(
+        '--certfile',
+        default='',
+        help='MQTT broker certificate file.')
+    subparser.add_argument(
+        '--keyfile',
+        default='',
+        help='MQTT broker key file.')
+    subparser.add_argument(
+        '--no-check-hostname',
+        action='store_true',
+        help='Do not check certificate hostname.')
     subparser.set_defaults(func=_do_broker)

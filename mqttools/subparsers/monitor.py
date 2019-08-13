@@ -1,8 +1,6 @@
 import sys
 import threading
-import textwrap
 import asyncio
-import re
 import time
 import curses
 import bisect
