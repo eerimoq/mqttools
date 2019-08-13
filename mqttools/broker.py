@@ -307,26 +307,36 @@ class Client(object):
 class Broker(object):
     """A limited MQTT version 5.0 broker.
 
-    `host` and `port` are the host and port to listen for clients on.
+    `host`, `port` and `secure_port` are the host and ports to listen
+    for clients on.
 
-    `kwargs` are passed to ``asyncio.start_server()``.
+    `secure_ssl` is an SSL context passed to `asyncio.start_server()`
+    as `ssl`.
 
     """
 
-    def __init__(self, host, port, **kwargs):
+    def __init__(self, host, port=1883, secure_port=8883, secure_ssl=None):
         self._host = host
         self._port = port
-        self._kwargs = kwargs
+        self._secure_port = secure_port
+        self._secure_ssl = secure_ssl
         self._sessions = {}
         self._subscribers = defaultdict(list)
         self._wildcard_subscribers = []
         self._listener = None
         self._listener_ready = asyncio.Event()
+        self._secure_listener = None
+        self._secure_listener_ready = asyncio.Event()
 
     async def getsockname(self):
         await self._listener_ready.wait()
 
         return self._listener.sockets[0].getsockname()
+
+    async def secure_getsockname(self):
+        await self._secure_listener_ready.wait()
+
+        return self._secure_listener.sockets[0].getsockname()
 
     async def serve_forever(self):
         """Setup a listener socket and forever serve clients. This coroutine
@@ -334,10 +344,15 @@ class Broker(object):
 
         """
 
+        await asyncio.gather(
+            self.insecure_serve_forever(),
+            self.secure_serve_forever()
+        )
+
+    async def insecure_serve_forever(self):
         self._listener = await asyncio.start_server(self.serve_client,
                                                     self._host,
-                                                    self._port,
-                                                    **self._kwargs)
+                                                    self._port)
         self._listener_ready.set()
         listener_address = self._listener.sockets[0].getsockname()
 
@@ -345,6 +360,22 @@ class Broker(object):
 
         async with self._listener:
             await self._listener.serve_forever()
+
+    async def secure_serve_forever(self):
+        if self._secure_ssl is None:
+            return
+
+        self._secure_listener = await asyncio.start_server(self.serve_client,
+                                                           self._host,
+                                                           self._secure_port,
+                                                           ssl=self._secure_ssl)
+        self._secure_listener_ready.set()
+        listener_address = self._secure_listener.sockets[0].getsockname()
+
+        LOGGER.info('Listening for secure clients on %s.', listener_address)
+
+        async with self._secure_listener:
+            await self._secure_listener.serve_forever()
 
     async def serve_client(self, reader, writer):
         client = Client(self, reader, writer)

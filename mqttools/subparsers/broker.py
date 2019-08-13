@@ -13,14 +13,14 @@ def _do_broker(args):
         print(f"CA File:  '{args.cafile}'")
         print(f"Check hostname: {not args.no_check_hostname}")
 
-        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH,
-                                                 cafile=args.cafile)
-        ssl_context.check_hostname = not args.no_check_hostname
-        ssl_context.load_cert_chain(certfile=args.certfile, keyfile=args.keyfile)
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH,
+                                             cafile=args.cafile)
+        context.check_hostname = not args.no_check_hostname
+        context.load_cert_chain(certfile=args.certfile, keyfile=args.keyfile)
     else:
-        ssl_context = None
+        context = None
 
-    broker = Broker(args.host, args.port, ssl=ssl_context)
+    broker = Broker(args.host, args.port, args.secure_port, secure_ssl=context)
     asyncio.run(broker.serve_forever())
 
 
@@ -34,6 +34,10 @@ def add_subparser(subparsers):
                            type=int,
                            default=1883,
                            help='Broker port (default: %(default)s).')
+    subparser.add_argument('--secure-port',
+                           type=int,
+                           default=8883,
+                           help='Secure broker port (default: %(default)s).')
     subparser.add_argument(
         '--cafile',
         default='',
