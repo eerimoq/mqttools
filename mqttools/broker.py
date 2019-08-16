@@ -327,6 +327,7 @@ class Broker(object):
         self._listener_ready = asyncio.Event()
         self._secure_listener = None
         self._secure_listener_ready = asyncio.Event()
+        self._client_tasks = set()
 
     async def getsockname(self):
         await self._listener_ready.wait()
@@ -344,10 +345,19 @@ class Broker(object):
 
         """
 
-        await asyncio.gather(
-            self.insecure_serve_forever(),
-            self.secure_serve_forever()
-        )
+        try:
+            await asyncio.gather(
+                self.insecure_serve_forever(),
+                self.secure_serve_forever()
+            )
+        except asyncio.CancelledError:
+            # Cancel all client tasks as the TCP server leaves them
+            # running.
+            for client_task in self._client_tasks:
+                client_task.cancel()
+
+            self._client_tasks = set()
+            raise
 
     async def insecure_serve_forever(self):
         self._listener = await asyncio.start_server(self.serve_client,
@@ -378,8 +388,17 @@ class Broker(object):
             await self._secure_listener.serve_forever()
 
     async def serve_client(self, reader, writer):
+        current_task = asyncio.current_task()
+        self._client_tasks.add(current_task)
         client = Client(self, reader, writer)
-        await client.serve_forever()
+
+        try:
+            await client.serve_forever()
+        finally:
+            try:
+                self._client_tasks.remove(current_task)
+            except KeyError:
+                pass
 
     def add_subscriber(self, topic, session):
         topic_sessions = self._subscribers[topic]
