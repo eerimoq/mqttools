@@ -1,3 +1,4 @@
+import ssl
 import asyncio
 
 from ..client import Client
@@ -7,17 +8,29 @@ from . import to_int
 
 async def subscriber(host,
                      port,
+                     cafile,
+                     check_hostname,
                      client_id,
                      topic,
                      keep_alive_s,
                      session_expiry_interval):
+    if cafile:
+        print(f"CA File:  '{cafile}'")
+        print(f"Check hostname: {check_hostname}")
+
+        context = ssl.create_default_context(cafile=cafile)
+        context.check_hostname = check_hostname
+    else:
+        context = None
+
     client = Client(host,
                     port,
                     client_id,
                     keep_alive_s=keep_alive_s,
                     session_expiry_interval=session_expiry_interval,
                     subscriptions=[topic],
-                    topic_alias_maximum=10)
+                    topic_alias_maximum=10,
+                    ssl=context)
 
     while True:
         print(f"Connecting to '{host}:{port}'.")
@@ -40,6 +53,8 @@ async def subscriber(host,
 def _do_subscribe(args):
     asyncio.run(subscriber(args.host,
                            args.port,
+                           args.cafile,
+                           not args.no_check_hostname,
                            args.client_id,
                            args.topic,
                            args.keep_alive,
@@ -69,5 +84,13 @@ def add_subparser(subparsers):
         default=0,
         type=to_int,
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
+    subparser.add_argument(
+        '--cafile',
+        default='',
+        help='CA file.')
+    subparser.add_argument(
+        '--no-check-hostname',
+        action='store_true',
+        help='Do not check certificate hostname.')
     subparser.add_argument('topic', help='Topic to subscribe for.')
     subparser.set_defaults(func=_do_subscribe)

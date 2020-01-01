@@ -1,3 +1,4 @@
+import ssl
 import asyncio
 import time
 import binascii
@@ -38,17 +39,29 @@ async def publisher(host,
                     will_topic,
                     will_message,
                     session_expiry_interval,
+                    cafile,
+                    check_hostname,
                     topic,
                     message):
     if will_message is not None:
         will_message = encode_message(will_message)
+
+    if cafile:
+        print(f"CA File:  '{cafile}'")
+        print(f"Check hostname: {check_hostname}")
+
+        context = ssl.create_default_context(cafile=cafile)
+        context.check_hostname = check_hostname
+    else:
+        context = None
 
     client = Client(host,
                     port,
                     client_id,
                     will_topic=will_topic,
                     will_message=will_message,
-                    session_expiry_interval=session_expiry_interval)
+                    session_expiry_interval=session_expiry_interval,
+                    ssl=context)
 
     print(f"Connecting to '{host}:{port}'.")
     print()
@@ -77,6 +90,8 @@ def _do_publish(args):
                           args.will_topic,
                           args.will_message,
                           args.session_expiry_interval,
+                          args.cafile,
+                          not args.no_check_hostname,
                           args.topic,
                           args.message))
 
@@ -110,6 +125,14 @@ def add_subparser(subparsers):
         default=0,
         type=to_int,
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
+    subparser.add_argument(
+        '--cafile',
+        default='',
+        help='CA file.')
+    subparser.add_argument(
+        '--no-check-hostname',
+        action='store_true',
+        help='Do not check certificate hostname.')
     subparser.add_argument('topic', help='Topic to publish.')
     subparser.add_argument(
         'message',

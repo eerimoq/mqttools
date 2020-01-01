@@ -8,9 +8,9 @@ def _do_broker(args):
     print(f"Starting a broker at '{args.host}:{args.port}'.")
 
     if all([args.cafile, args.certfile, args.keyfile]):
+        print(f"CA File:  '{args.cafile}'")
         print(f"Certfile: '{args.certfile}'")
         print(f"Keyfile:  '{args.keyfile}'")
-        print(f"CA File:  '{args.cafile}'")
         print(f"Check hostname: {not args.no_check_hostname}")
 
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH,
@@ -41,7 +41,7 @@ def add_subparser(subparsers):
     subparser.add_argument(
         '--cafile',
         default='',
-        help='MQTT broker CA file.')
+        help='CA file.')
     subparser.add_argument(
         '--certfile',
         default='',

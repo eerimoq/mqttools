@@ -1,3 +1,4 @@
+import ssl
 import sys
 import threading
 import asyncio
@@ -23,19 +24,31 @@ class ClientThread(threading.Thread):
         self._queue = queue
         self._host = args.host
         self._port = args.port
+        self._cafile = args.cafile
+        self._check_hostname = not args.no_check_hostname
         self._client_id = args.client_id
         self._keep_alive_s = args.keep_alive
         self._session_expiry_interval = args.session_expiry_interval
         self._topics = args.subscribe
 
     async def main(self):
+        if self._cafile:
+            print(f"CA File:  '{self._cafile}'")
+            print(f"Check hostname: {self._check_hostname}")
+
+            context = ssl.create_default_context(cafile=self._cafile)
+            context.check_hostname = self._check_hostname
+        else:
+            context = None
+
         client = Client(self._host,
                         self._port,
                         self._client_id,
                         keep_alive_s=self._keep_alive_s,
                         session_expiry_interval=self._session_expiry_interval,
                         subscriptions=self._topics,
-                        topic_alias_maximum=10)
+                        topic_alias_maximum=10,
+                        ssl=context)
 
         while True:
             await client.start()
@@ -239,6 +252,14 @@ def add_subparser(subparsers):
         default=0,
         type=to_int,
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
+    subparser.add_argument(
+        '--cafile',
+        default='',
+        help='CA file.')
+    subparser.add_argument(
+        '--no-check-hostname',
+        action='store_true',
+        help='Do not check certificate hostname.')
     subparser.add_argument(
         'subscribe',
         nargs='*',
