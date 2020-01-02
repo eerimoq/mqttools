@@ -314,7 +314,7 @@ class Client(object):
                 break
             except SessionResumeError:
                 raise
-            except Exception as e:
+            except (Exception, asyncio.CancelledError) as e:
                 if isinstance(e, ConnectionRefusedError):
                     LOGGER.info('TCP connect refused.')
                 elif isinstance(e, TimeoutError):
@@ -370,7 +370,7 @@ class Client(object):
             if not resume_session or not session_present:
                 for topic in self._subscriptions:
                     await self.subscribe(topic)
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             await self.stop()
             raise
 
@@ -390,7 +390,7 @@ class Client(object):
 
         try:
             self.disconnect()
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             pass
 
         if self._reader_task is not None:
@@ -398,7 +398,7 @@ class Client(object):
 
             try:
                 await self._reader_task
-            except Exception:
+            except (Exception, asyncio.CancelledError):
                 pass
 
         if self._keep_alive_task is not None:
@@ -406,7 +406,7 @@ class Client(object):
 
             try:
                 await self._keep_alive_task
-            except Exception:
+            except (Exception, asyncio.CancelledError):
                 pass
 
         if self._writer is not None:
@@ -630,7 +630,7 @@ class Client(object):
 
         try:
             await self.reader_loop()
-        except Exception as e:
+        except (Exception, asyncio.CancelledError) as e:
             LOGGER.info('Reader task stopped by %r.', e)
 
             if isinstance(e, MalformedPacketError):
@@ -658,7 +658,7 @@ class Client(object):
 
         try:
             await self.keep_alive_loop()
-        except Exception as e:
+        except (Exception, asyncio.CancelledError) as e:
             LOGGER.info('Keep alive task stopped by %r.', e)
             await self._close()
 
