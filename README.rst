@@ -44,7 +44,7 @@ https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
 
 Project homepage: https://github.com/eerimoq/mqttools
 
-Documentation: https://mqttools.readthedocs.org/en/latest
+Documentation: https://mqttools.readthedocs.io
 
 Installation
 ============

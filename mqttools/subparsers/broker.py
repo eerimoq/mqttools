@@ -5,14 +5,7 @@ from ..broker import Broker
 
 
 def _do_broker(args):
-    print(f"Starting a broker at '{args.host}:{args.port}'.")
-
     if all([args.cafile, args.certfile, args.keyfile]):
-        print(f"CA File:  '{args.cafile}'")
-        print(f"Certfile: '{args.certfile}'")
-        print(f"Keyfile:  '{args.keyfile}'")
-        print(f"Check hostname: {not args.no_check_hostname}")
-
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH,
                                              cafile=args.cafile)
         context.check_hostname = not args.no_check_hostname
