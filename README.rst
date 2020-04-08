@@ -6,7 +6,7 @@ MQTT Tools
 
 MQTT tools in Python 3.7 and later.
 
-Both the client and the broker implments MQTT version 5.0 using
+Both the client and the broker implements MQTT version 5.0 using
 ``asyncio``.
 
 Client features:
