@@ -929,21 +929,87 @@ class BrokerTest(unittest.TestCase):
         async def tester():
             address = await broker.getsockname()
 
-            # Connect with will topic 'foo' and message 'bar'.
+            # Setup the subscriber. Subscribe to 'foo'.
             reader_1, writer_1 = await asyncio.open_connection(*address)
-            connect = (
-                b'\x10\x1a\x00\x04MQTT\x05\x06\x00\x00\x00\x00\x02id\x00\x00'
-                b'\x03foo\x00\x03bar')
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
             writer_1.write(connect)
             connack = await reader_1.readexactly(13)
             self.assertEqual(
                 connack,
                 b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x09\x00\x01\x00\x00\x03foo\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
 
-            # ToDo: Verify that the will is published when the client
-            # is lost.
+            # Connect with will topic 'foo' and message 'bar'.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = (
+                b'\x10\x1a\x00\x04MQTT\x05\x06\x00\x00\x00\x00\x02id\x00\x00'
+                b'\x03foo\x00\x03bar')
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Verify that the will is published when the client is
+            # lost.
+            writer_2.close()
+            publish = await reader_1.readexactly(11)
+            self.assertEqual(
+                publish,
+                b'\x30\x09\x00\x03foo\x00bar')
 
             writer_1.close()
+            broker_task.cancel()
+
+        await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_do_not_publish_will_on_normal_disconnect(self):
+        asyncio.run(self.do_not_publish_will_on_normal_disconnect())
+
+    async def do_not_publish_will_on_normal_disconnect(self):
+        broker, broker_task = self.create_broker()
+
+        async def tester():
+            address = await broker.getsockname()
+
+            # Setup the subscriber. Subscribe to 'foo'.
+            reader_1, writer_1 = await asyncio.open_connection(*address)
+            connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
+            writer_1.write(connect)
+            connack = await reader_1.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+            subscribe = b'\x82\x09\x00\x01\x00\x00\x03foo\x00'
+            writer_1.write(subscribe)
+            suback = await reader_1.readexactly(6)
+            self.assertEqual(suback, b'\x90\x04\x00\x01\x00\x00')
+
+            # Connect with will topic 'foo' and message 'bar'.
+            reader_2, writer_2 = await asyncio.open_connection(*address)
+            connect = (
+                b'\x10\x1a\x00\x04MQTT\x05\x06\x00\x00\x00\x00\x02id\x00\x00'
+                b'\x03foo\x00\x03bar')
+            writer_2.write(connect)
+            connack = await reader_2.readexactly(13)
+            self.assertEqual(
+                connack,
+                b'\x20\x0b\x00\x00\x08\x24\x00\x25\x00\x28\x00\x2a\x00')
+
+            # Verify that the will is not published when the client is
+            # normally disconnected.
+            disconnect = b'\xe0\x02\x00\x00'
+            writer_2.write(disconnect)
+            writer_2.close()
+
+            with self.assertRaises(asyncio.TimeoutError):
+                await asyncio.wait_for(reader_1.readexactly(1), 0.250)
+
+            writer_1.close()
+
             broker_task.cancel()
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)

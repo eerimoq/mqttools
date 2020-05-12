@@ -78,7 +78,7 @@ class Client(object):
         self._reader = reader
         self._writer = writer
         self._session = None
-        self._disconnect_reason = DisconnectReasonCode.NORMAL_DISCONNECTION
+        self._disconnect_reason = DisconnectReasonCode.UNSPECIFIED_ERROR
 
     async def serve_forever(self):
         addr = self._writer.get_extra_info('peername')
@@ -94,8 +94,10 @@ class Client(object):
                 raise ConnectError()
 
             await self.reader_loop()
-        except (ConnectError, DisconnectError):
+        except ConnectError:
             pass
+        except DisconnectError:
+            self._disconnect_reason = DisconnectReasonCode.NORMAL_DISCONNECTION
         except asyncio.IncompleteReadError:
             self.log_debug('Client connection lost.')
         except Exception as e:
@@ -112,10 +114,10 @@ class Client(object):
         if self._session is not None:
             self._session.client = None
 
-            # ToDo: Should not publish on normal disconnection.
             if self._session.will_topic is not None:
-                self._broker.publish(self._session.will_topic,
-                                     self._session.will_message)
+                if not self.is_normal_disconnection():
+                    self._broker.publish(self._session.will_topic,
+                                         self._session.will_message)
 
             if self._session.expiry_interval == 0:
                 self._broker.remove_session(self._session.client_id)
@@ -302,6 +304,9 @@ class Client(object):
                 LOGGER.info(fmt, *args)
             else:
                 LOGGER.info(f'{self._session.client_id} {fmt}', *args)
+
+    def is_normal_disconnection(self):
+        return self._disconnect_reason == DisconnectReasonCode.NORMAL_DISCONNECTION
 
 
 class Broker(object):
