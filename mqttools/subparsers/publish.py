@@ -36,6 +36,7 @@ async def publisher(host,
                     client_id,
                     count,
                     size,
+                    retained,
                     will_topic,
                     will_message,
                     session_expiry_interval,
@@ -73,7 +74,7 @@ async def publisher(host,
 
     for number in range(count):
         message_bytes = create_message(message, size, number, fmt)
-        client.publish(topic, message_bytes)
+        client.publish(topic, message_bytes, retained=retained)
 
     elapsed_time = format_timespan(time.time() - start_time)
     print(f'Published {count} message(s) in {elapsed_time}.')
@@ -87,6 +88,7 @@ def _do_publish(args):
                           args.client_id,
                           args.count,
                           args.size,
+                          args.retained,
                           args.will_topic,
                           args.will_message,
                           args.session_expiry_interval,
@@ -118,6 +120,9 @@ def add_subparser(subparsers):
         type=int,
         default=10,
         help='Generated message size (default: %(default)s).')
+    subparser.add_argument('--retained',
+                           action='store_true',
+                           help='Retained message.')
     subparser.add_argument('--will-topic', help='Will topic.')
     subparser.add_argument('--will-message', help='Will message.')
     subparser.add_argument(

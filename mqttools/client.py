@@ -517,8 +517,10 @@ class Client(object):
             if reason != UnsubackReasonCode.SUCCESS:
                 raise UnsubscribeError(reason)
 
-    def publish(self, topic, message):
+    def publish(self, topic, message, retained=False):
         """Publish given message to given topic with QoS 0.
+
+        Give `retained` as ``True`` to make the message retained.
 
         >>> client.publish('/my/topic', b'my-message')
 
@@ -532,7 +534,7 @@ class Client(object):
         else:
             alias = None
 
-        self._write_packet(pack_publish(topic, message, alias))
+        self._write_packet(pack_publish(topic, message, retained, alias))
 
         if (alias is not None) and (topic != ''):
             self._registered_broker_topic_aliases.add(alias)

@@ -712,7 +712,12 @@ def unpack_unsuback(payload):
     return packet_identifier, properties, reasons
 
 
-def pack_publish(topic, message, alias):
+def pack_publish(topic, message, retained, alias):
+    flags = 0
+
+    if retained:
+        flags |= 1
+
     if alias is None:
         properties = b'\x00'
     else:
@@ -721,7 +726,7 @@ def pack_publish(topic, message, alias):
 
     packed_topic = pack_string(topic)
     size = len(packed_topic) + len(message) + len(properties)
-    packed = pack_fixed_header(ControlPacketType.PUBLISH, 0, size)
+    packed = pack_fixed_header(ControlPacketType.PUBLISH, flags, size)
     packed += packed_topic
     packed += properties
     packed += message

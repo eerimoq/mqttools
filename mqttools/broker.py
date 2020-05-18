@@ -273,7 +273,7 @@ class Client(object):
         raise DisconnectError()
 
     def publish(self, topic, message):
-        self._write_packet(pack_publish(topic, message, None))
+        self._write_packet(pack_publish(topic, message, 0, None))
 
     def disconnect(self):
         self._write_packet(pack_disconnect(self._disconnect_reason))

@@ -17,15 +17,8 @@ BROKER_PORT = 10008
 
 
 async def start_client():
-    client = mqttools.Client('localhost', BROKER_PORT)
-
-    while True:
-        try:
-            await client.start()
-            break
-        except:
-            print('Client start failed. Retrying...')
-            await asyncio.sleep(0.2)
+    client = mqttools.Client('localhost', BROKER_PORT, connect_delays=[0.1])
+    await client.start()
 
     return client
 
