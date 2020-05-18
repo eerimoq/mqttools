@@ -161,6 +161,7 @@ class Client(object):
                  client_id=None,
                  will_topic='',
                  will_message=b'',
+                 will_retain=False,
                  will_qos=0,
                  keep_alive_s=60,
                  response_timeout=5,
@@ -179,6 +180,7 @@ class Client(object):
         self._client_id = client_id
         self._will_topic = will_topic
         self._will_message = will_message
+        self._will_retain = will_retain
         self._will_qos = will_qos
         self._keep_alive_s = keep_alive_s
         self._kwargs = kwargs
@@ -418,6 +420,7 @@ class Client(object):
                                         not resume_session,
                                         self._will_topic,
                                         self._will_message,
+                                        self._will_retain,
                                         self._will_qos,
                                         self._keep_alive_s,
                                         self._connect_properties))
@@ -517,10 +520,10 @@ class Client(object):
             if reason != UnsubackReasonCode.SUCCESS:
                 raise UnsubscribeError(reason)
 
-    def publish(self, topic, message, retained=False):
+    def publish(self, topic, message, retain=False):
         """Publish given message to given topic with QoS 0.
 
-        Give `retained` as ``True`` to make the message retained.
+        Give `retain` as ``True`` to make the message retained.
 
         >>> client.publish('/my/topic', b'my-message')
 
@@ -534,7 +537,7 @@ class Client(object):
         else:
             alias = None
 
-        self._write_packet(pack_publish(topic, message, retained, alias))
+        self._write_packet(pack_publish(topic, message, retain, alias))
 
         if (alias is not None) and (topic != ''):
             self._registered_broker_topic_aliases.add(alias)

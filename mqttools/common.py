@@ -406,6 +406,7 @@ def pack_connect(client_id,
                  clean_start,
                  will_topic,
                  will_message,
+                 will_retain,
                  will_qos,
                  keep_alive_s,
                  properties):
@@ -418,6 +419,9 @@ def pack_connect(client_id,
 
     if will_topic:
         flags |= WILL_FLAG
+
+        if will_retain:
+            flags |= WILL_RETAIN
 
         if will_qos == 1:
             flags |= WILL_QOS_1
@@ -489,9 +493,11 @@ def unpack_connect(payload):
             payload)
         will_topic = unpack_string(payload)
         will_message = unpack_binary(payload)
+        will_retain = bool(flags & WILL_RETAIN)
     else:
         will_topic = None
         will_message = None
+        will_retain = None
 
     if flags & USER_NAME_FLAG:
         user_name = unpack_string(payload)
@@ -507,6 +513,7 @@ def unpack_connect(payload):
             clean_start,
             will_topic,
             will_message,
+            will_retain,
             keep_alive_s,
             properties,
             user_name,
@@ -712,10 +719,10 @@ def unpack_unsuback(payload):
     return packet_identifier, properties, reasons
 
 
-def pack_publish(topic, message, retained, alias):
+def pack_publish(topic, message, retain, alias):
     flags = 0
 
-    if retained:
+    if retain:
         flags |= 1
 
     if alias is None:
@@ -784,6 +791,7 @@ def format_connect(payload):
      clean_start,
      will_topic,
      will_message,
+     will_retain,
      keep_alive_s,
      properties,
      user_name,
@@ -794,6 +802,7 @@ def format_connect(payload):
         f'  CleanStart:  {clean_start}',
         f'  WillTopic:   {will_topic}',
         f'  WillMessage: {hexlify(will_message)}',
+        f'  WillRetain:  {will_retain}',
         f'  KeepAlive:   {keep_alive_s}',
         f'  UserName:    {user_name}',
         f'  Password:    {password}'

@@ -36,9 +36,10 @@ async def publisher(host,
                     client_id,
                     count,
                     size,
-                    retained,
+                    retain,
                     will_topic,
                     will_message,
+                    will_retain,
                     session_expiry_interval,
                     cafile,
                     check_hostname,
@@ -61,6 +62,7 @@ async def publisher(host,
                     client_id,
                     will_topic=will_topic,
                     will_message=will_message,
+                    will_retain=will_retain,
                     session_expiry_interval=session_expiry_interval,
                     ssl=context)
 
@@ -74,7 +76,7 @@ async def publisher(host,
 
     for number in range(count):
         message_bytes = create_message(message, size, number, fmt)
-        client.publish(topic, message_bytes, retained=retained)
+        client.publish(topic, message_bytes, retain=retain)
 
     elapsed_time = format_timespan(time.time() - start_time)
     print(f'Published {count} message(s) in {elapsed_time}.')
@@ -88,9 +90,10 @@ def _do_publish(args):
                           args.client_id,
                           args.count,
                           args.size,
-                          args.retained,
+                          args.retain,
                           args.will_topic,
                           args.will_message,
+                          args.will_retain,
                           args.session_expiry_interval,
                           args.cafile,
                           not args.no_check_hostname,
@@ -120,11 +123,14 @@ def add_subparser(subparsers):
         type=int,
         default=10,
         help='Generated message size (default: %(default)s).')
-    subparser.add_argument('--retained',
+    subparser.add_argument('--retain',
                            action='store_true',
-                           help='Retained message.')
+                           help='Retain the message.')
     subparser.add_argument('--will-topic', help='Will topic.')
     subparser.add_argument('--will-message', help='Will message.')
+    subparser.add_argument('--will-retain',
+                           action='store_true',
+                           help='Retain the will message.')
     subparser.add_argument(
         '--session-expiry-interval',
         default=0,

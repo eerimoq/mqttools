@@ -71,6 +71,15 @@ def is_wildcards_in_topic(topic):
     return '#' in topic or '+' in topic
 
 
+def compile_wildcards_topic(topic):
+    pattern = topic.replace('+', '[^/]*')
+    pattern = pattern.replace('/#', '.*')
+    pattern = pattern.replace('#', '.*')
+    pattern = '^' + pattern + '$'
+
+    return re.compile(pattern)
+
+
 class Client(object):
 
     def __init__(self, broker, reader, writer):
@@ -119,6 +128,10 @@ class Client(object):
                     self._broker.publish(self._session.will_topic,
                                          self._session.will_message)
 
+                    if self._session.will_retain:
+                        self._broker.add_retained_message(self._session.will_topic,
+                                                          self._session.will_message)
+
             if self._session.expiry_interval == 0:
                 self._broker.remove_session(self._session.client_id)
 
@@ -129,7 +142,7 @@ class Client(object):
             packet_type, flags, payload = await self.read_packet()
 
             if packet_type == ControlPacketType.PUBLISH:
-                self.on_publish(payload)
+                self.on_publish(payload, flags)
             elif packet_type == ControlPacketType.SUBSCRIBE:
                 self.on_subscribe(payload)
             elif packet_type == ControlPacketType.UNSUBSCRIBE:
@@ -167,6 +180,7 @@ class Client(object):
          clean_start,
          will_topic,
          will_message,
+         will_retain,
          keep_alive_s,
          properties,
          user_name,
@@ -194,6 +208,7 @@ class Client(object):
 
         self._session.will_topic = will_topic
         self._session.will_message = will_message
+        self._session.will_retain = will_retain
 
         if PropertyIds.SESSION_EXPIRY_INTERVAL in properties:
             session_expiry_interval = properties[PropertyIds.SESSION_EXPIRY_INTERVAL]
@@ -217,31 +232,50 @@ class Client(object):
 
         self.log_info('Client connected.')
 
-    def on_publish(self, payload):
-        topic, message, _ = unpack_publish(payload, 0)
+    def on_publish(self, payload, flags):
+        topic, message, _ = unpack_publish(payload, (flags >> 1) & 3)
 
         if is_wildcards_in_topic(topic):
             raise MalformedPacketError(f'Invalid topic {topic} in publish.')
+
+        if flags & 1:
+            if message:
+                self._broker.add_retained_message(topic, message)
+            else:
+                self._broker.remove_retained_message(topic)
 
         self._broker.publish(topic, message)
 
     def on_subscribe(self, payload):
         packet_identifier, _, subscriptions = unpack_subscribe(payload)
         reasons = bytearray()
+        retained_messages = []
 
         for topic, _ in subscriptions:
             if is_wildcards_in_topic(topic):
                 if topic not in self._session.wildcard_subscriptions:
                     self._session.wildcard_subscriptions.add(topic)
                     self._broker.add_wildcard_subscriber(topic, self._session)
-            elif topic not in self._session.subscriptions:
-                self._session.subscriptions.add(topic)
-                self._broker.add_subscriber(topic, self._session)
+
+                retained_messages += list(
+                    self._broker.find_retained_messages_wildcards(topic))
+            else:
+                if topic not in self._session.subscriptions:
+                    self._session.subscriptions.add(topic)
+                    self._broker.add_subscriber(topic, self._session)
+
+                retained_message = self._broker.find_retained_message(topic)
+
+                if retained_message:
+                    retained_messages.append(retained_message)
 
             reason = SubackReasonCode.GRANTED_QOS_0
             reasons.append(reason)
 
         self._write_packet(pack_suback(packet_identifier, reasons))
+
+        for topic, message in retained_messages:
+            self.publish(topic, message)
 
     def on_unsubscribe(self, payload):
         packet_identifier, topics = unpack_unsubscribe(payload)
@@ -273,7 +307,7 @@ class Client(object):
         raise DisconnectError()
 
     def publish(self, topic, message):
-        self._write_packet(pack_publish(topic, message, 0, None))
+        self._write_packet(pack_publish(topic, message, False, None))
 
     def disconnect(self):
         self._write_packet(pack_disconnect(self._disconnect_reason))
@@ -333,6 +367,7 @@ class Broker(object):
         self._secure_listener = None
         self._secure_listener_ready = asyncio.Event()
         self._client_tasks = set()
+        self._retained_messages = {}
 
     async def getsockname(self):
         await self._listener_ready.wait()
@@ -418,17 +453,38 @@ class Broker(object):
             del topic_sessions[topic_sessions.index(session)]
 
     def add_wildcard_subscriber(self, topic, session):
-        pattern = topic.replace('+', '[^/]*')
-        pattern = pattern.replace('/#', '.*')
-        pattern = pattern.replace('#', '.*')
-        pattern = '^' + pattern + '$'
-        self._wildcard_subscribers.append((topic, session, re.compile(pattern)))
+        re_topic = compile_wildcards_topic(topic)
+        self._wildcard_subscribers.append((topic, session, re_topic))
 
     def remove_wildcard_subscriber(self, topic, session):
         for index, subscriber in enumerate(self._wildcard_subscribers):
             if topic == subscriber[0] and session == subscriber[1]:
                 del self._wildcard_subscribers[index]
                 break
+
+    def add_retained_message(self, topic, message):
+        self._retained_messages[topic] = message
+
+    def remove_retained_message(self, topic):
+        try:
+            del self._retained_messages[topic]
+        except KeyError:
+            pass
+
+    def find_retained_messages_wildcards(self, topic):
+        re_topic = compile_wildcards_topic(topic)
+
+        for topic in self._retained_messages:
+            mo = re_topic.match(topic)
+
+            if mo:
+                yield (topic, self._retained_messages[topic])
+
+    def find_retained_message(self, topic):
+        if topic in self._retained_messages:
+            return (topic, self._retained_messages[topic])
+        else:
+            return None
 
     def iter_subscribers(self, topic):
         for session in self._subscribers[topic]:
@@ -467,7 +523,7 @@ class Broker(object):
     def remove_session(self, client_id):
         del self._sessions[client_id]
 
-    def publish(self, topic, message):
+    def  publish(self, topic, message):
         """Publish given topic and message to all subscribers.
 
         """
