@@ -222,7 +222,6 @@ class Client(object):
             reason,
             {
                 PropertyIds.MAXIMUM_QOS: 0,
-                PropertyIds.RETAIN_AVAILABLE: 0,
                 PropertyIds.WILDCARD_SUBSCRIPTION_AVAILABLE: 0,
                 PropertyIds.SHARED_SUBSCRIPTION_AVAILABLE: 0
             }))
