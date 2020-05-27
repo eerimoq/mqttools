@@ -6,9 +6,6 @@
 .. toctree::
    :maxdepth: 2
 
-MQTT Tools
-==========
-
 .. include:: ../README.rst
 
 Functions and classes
