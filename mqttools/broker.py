@@ -356,6 +356,11 @@ class Broker(object):
     `secure_ssl` is an SSL context passed to `asyncio.start_server()`
     as `ssl`.
 
+    Create a broker and serve clients:
+
+    >>> broker = Broker('broker.hivemq.com')
+    >>> await broker.serve_forever()
+
     """
 
     def __init__(self, host, port=1883, secure_port=8883, secure_ssl=None):
