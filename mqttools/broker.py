@@ -570,13 +570,6 @@ class BrokerThread(threading.Thread):
         finally:
             self.loop.close()
 
-    def start(self):
-        """Start the broker.
-
-        """
-
-        super().start()
-
     def stop(self):
         """Stop the broker. All clients will be disconnected and the thread
         will terminate.

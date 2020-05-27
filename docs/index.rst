@@ -21,7 +21,11 @@ Functions and classes
     :members:
 
 .. autoclass:: mqttools.BrokerThread
-    :members:
+    :members: stop
+
+   .. method:: start()
+
+      Start the broker.
 
 .. autoclass:: mqttools.ConnectError
     :members:
