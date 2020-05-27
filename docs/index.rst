@@ -18,7 +18,7 @@ Functions and classes
    :members:
 
 .. autoclass:: mqttools.Broker
-   :members:
+   :members: serve_forever
 
 .. autoclass:: mqttools.BrokerThread
    :members: stop
