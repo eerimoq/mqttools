@@ -545,6 +545,13 @@ class BrokerThread(threading.Thread):
     `secure_ssl` is an SSL context passed to `asyncio.start_server()`
     as `ssl`.
 
+    Create a broker and serve clients for 60 seconds:
+
+    >>> broker = BrokerThread('broker.hivemq.com')
+    >>> broker.start()
+    >>> time.sleep(60)
+    >>> broker.stop()
+
     """
 
     def __init__(self, host, port=1883, secure_port=8883, secure_ssl=None):

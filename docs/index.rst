@@ -25,7 +25,7 @@ Functions and classes
 
    .. method:: start()
 
-      Start the broker.
+      Start the broker in a thread. This function returns immediately.
 
 .. autoclass:: mqttools.ConnectError
    :members:
