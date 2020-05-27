@@ -15,29 +15,29 @@ Functions and classes
 =====================
 
 .. autoclass:: mqttools.Client
-    :members:
+   :members:
 
 .. autoclass:: mqttools.Broker
-    :members:
+   :members:
 
 .. autoclass:: mqttools.BrokerThread
-    :members: stop
+   :members: stop
 
    .. method:: start()
 
       Start the broker.
 
 .. autoclass:: mqttools.ConnectError
-    :members:
+   :members:
 
 .. autoclass:: mqttools.SessionResumeError
-    :members:
+   :members:
 
 .. autoclass:: mqttools.SubscribeError
-    :members:
+   :members:
 
 .. autoclass:: mqttools.UnsubscribeError
-    :members:
+   :members:
 
 .. autoclass:: mqttools.TimeoutError
-    :members:
+   :members:
