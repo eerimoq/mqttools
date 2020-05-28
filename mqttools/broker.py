@@ -542,13 +542,7 @@ class Broker(object):
 
 
 class BrokerThread(threading.Thread):
-    """A limited MQTT version 5.0 broker running in a thread.
-
-    `host`, `port` and `secure_port` are the host and ports to listen
-    for clients on.
-
-    `secure_ssl` is an SSL context passed to `asyncio.start_server()`
-    as `ssl`.
+    """The same as :class:`Broker`, but running in a thread.
 
     Create a broker and serve clients for 60 seconds:
 
@@ -559,28 +553,23 @@ class BrokerThread(threading.Thread):
 
     """
 
-    def __init__(self, host, port=1883, secure_port=8883, secure_ssl=None):
+    def __init__(self, *args, **kwargs):
         super().__init__()
-        self._host = host
-        self._port = port
-        self._secure_port = secure_port
-        self._secure_ssl = secure_ssl
+        self._args = args
+        self._kwargs = kwargs
         self.daemon = True
-        self._loop = None
-        self._broker = None
-        self._broker_task = None
+        self._loop = asyncio.new_event_loop()
+        self._broker_task = self._loop.create_task(self._run())
         self._running = False
 
     def run(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.broker_task = self.loop.create_task(self._run())
+        asyncio.set_event_loop(self._loop)
         self._running = True
 
         try:
-            self.loop.run_until_complete(self.broker_task)
+            self._loop.run_until_complete(self._broker_task)
         finally:
-            self.loop.close()
+            self._loop.close()
 
     def stop(self):
         """Stop the broker. All clients will be disconnected and the thread
@@ -594,18 +583,15 @@ class BrokerThread(threading.Thread):
         self._running = False
 
         def cancel_broker_task():
-            self.broker_task.cancel()
+            self._broker_task.cancel()
 
-        self.loop.call_soon_threadsafe(cancel_broker_task)
+        self._loop.call_soon_threadsafe(cancel_broker_task)
         self.join()
 
     async def _run(self):
-        self._broker = Broker(self._host,
-                              self._port,
-                              self._secure_port,
-                              self._secure_ssl)
+        broker = Broker(*self._args, **self._kwargs)
 
         try:
-            await self._broker.serve_forever()
+            await broker.serve_forever()
         except asyncio.CancelledError:
-            self._broker = None
+            pass
