@@ -907,7 +907,7 @@ def format_packet(prefix, packet):
         packet_kind = packet_type.name
         lines.append(
             f'{prefix} {packet_kind}({packet_type.value}) packet of {len(packet)} '
-            f'byte(s) with data {hexlify(packet)}')
+            f'byte(s)')
 
         if packet_kind == 'CONNECT':
             lines += format_connect(payload)
