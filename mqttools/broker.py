@@ -24,6 +24,7 @@ from .common import pack_pingresp
 from .common import pack_disconnect
 from .common import unpack_disconnect
 from .common import format_packet
+from .common import format_packet_compact
 from .common import CF_FIXED_HEADER
 from .common import MAXIMUM_PACKET_SIZE
 
@@ -177,6 +178,8 @@ class Client(object):
         if LOGGER.isEnabledFor(logging.DEBUG):
             for line in format_packet('Received', buf + data):
                 self.log_debug(line)
+        elif LOGGER.isEnabledFor(logging.INFO):
+            self.log_info(format_packet_compact('Received', buf + data))
 
         return packet_type, flags, PayloadReader(data)
 
@@ -316,15 +319,19 @@ class Client(object):
     def disconnect(self):
         self._write_packet(pack_disconnect(self._disconnect_reason))
 
+    def _send_prefix(self, message):
+        if len(message) <= self._session.maximum_packet_size:
+            return 'Sending'
+        else:
+            return 'Not sending'
+
     def _write_packet(self, message):
         if LOGGER.isEnabledFor(logging.DEBUG):
-            if len(message) <= self._session.maximum_packet_size:
-                prefix = 'Sending'
-            else:
-                prefix = 'Not sending'
-
-            for line in format_packet(prefix, message):
+            for line in format_packet(self._send_prefix(message), message):
                 self.log_debug(line)
+        elif LOGGER.isEnabledFor(logging.INFO):
+            self.log_info(format_packet_compact(self._send_prefix(message),
+                                                message))
 
         if len(message) <= self._session.maximum_packet_size:
             self._writer.write(message)

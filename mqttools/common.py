@@ -929,3 +929,128 @@ def format_packet(prefix, packet):
         lines.append(f'  *** Malformed packet ({e}) ***')
 
     return lines
+
+
+def format_connect_compact(payload):
+    (client_id,
+     _,
+     will_topic,
+     will_message,
+     _,
+     keep_alive_s,
+     _,
+     __name,
+     _) = unpack_connect(payload)
+
+    parts = [f'ClientId={client_id}']
+
+    if will_topic is not None:
+        parts.append(f'WillTopic={will_topic}')
+
+    if will_message is not None:
+        parts.append(f'WillMessage={will_message}')
+
+    parts.append(f'KeepAlive={keep_alive_s}')
+
+    return parts
+
+
+def format_connack_compact(payload):
+    _, reason, _ = unpack_connack(payload)
+
+    return [f'Reason={reason.name}({reason.value})']
+
+
+def format_publish_compact(flags, payload):
+    qos = ((flags >> 1) & 0x3)
+    topic, message, _ = unpack_publish(payload, qos)
+
+    return [
+        f'Topic={topic}',
+        f'Message={hexlify(message)}',
+    ]
+
+
+def format_subscribe_compact(payload):
+    _, _, subscriptions = unpack_subscribe(payload)
+    parts = []
+
+    for topic, _ in subscriptions:
+        parts.append(f'Topic={topic}')
+
+    return parts
+
+
+def format_suback_compact(payload):
+    _, _, reasons = unpack_suback(payload)
+    parts = []
+
+    for reason in reasons:
+        parts.append(f'Reason={reason.name}({reason.value})')
+
+    return parts
+
+
+def format_unsubscribe_compact(payload):
+    _, topics = unpack_unsubscribe(payload)
+    parts = []
+
+    for topic in topics:
+        parts.append(f'Topic={topic}')
+
+    return parts
+
+
+def format_unsuback_compact(payload):
+    _, _, reasons = unpack_unsuback(payload)
+    parts = []
+
+    for reason in reasons:
+        parts.append(f'Reason={reason.name}({reason.value})')
+
+    return parts
+
+
+def format_disconnect_compact(payload):
+    reason, _ = unpack_disconnect(payload)
+
+    return [f'Reason={reason.name}({reason.value})']
+
+
+def format_packet_compact(prefix, packet):
+    try:
+        packet_type, flags = unpack_fixed_header(packet)
+        payload = PayloadReader(packet[1:])
+        size = unpack_variable_integer(payload)
+        packet_kind = packet_type.name
+    except Exception as e:
+        return f'{prefix} *** Malformed packet ({e}) ***'
+
+    try:
+        if packet_kind == 'CONNECT':
+            extra = format_connect_compact(payload)
+        elif packet_kind == 'CONNACK':
+            extra = format_connack_compact(payload)
+        elif packet_kind == 'PUBLISH':
+            extra = format_publish_compact(flags, payload)
+        elif packet_kind == 'SUBSCRIBE':
+            extra = format_subscribe_compact(payload)
+        elif packet_kind == 'SUBACK':
+            extra = format_suback_compact(payload)
+        elif packet_kind == 'UNSUBSCRIBE':
+            extra = format_unsubscribe_compact(payload)
+        elif packet_kind == 'UNSUBACK':
+            extra = format_unsuback_compact(payload)
+        elif packet_kind == 'DISCONNECT':
+            extra = format_disconnect_compact(payload)
+        else:
+            extra = []
+
+        extra = ', '.join(extra)
+
+        if extra:
+            extra = ': ' + extra
+    except Exception as e:
+        extra = f': *** Malformed packet ({e}) ***'
+
+    return f'{prefix} {packet_kind}({packet_type.value}){extra}'

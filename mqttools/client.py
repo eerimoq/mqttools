@@ -25,6 +25,7 @@ from .common import MalformedPacketError
 from .common import TimeoutError
 from .common import PayloadReader
 from .common import format_packet
+from .common import format_packet_compact
 from .common import CF_FIXED_HEADER
 
 
@@ -671,6 +672,8 @@ class Client(object):
         if LOGGER.isEnabledFor(logging.DEBUG):
             for line in format_packet('Sending', message):
                 LOGGER.debug(line)
+        elif LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info(format_packet_compact('Sending', message))
 
         self._writer.write(message)
 
@@ -692,6 +695,8 @@ class Client(object):
         if LOGGER.isEnabledFor(logging.DEBUG):
             for line in format_packet('Received', buf + data):
                 LOGGER.debug(line)
+        elif LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info(format_packet_compact('Received', buf + data))
 
         return packet_type, flags, PayloadReader(data)
 
