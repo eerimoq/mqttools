@@ -73,7 +73,7 @@ async def broker_main():
 
     """
 
-    broker = mqttools.Broker('localhost', BROKER_PORT)
+    broker = mqttools.Broker(('localhost', BROKER_PORT))
     await broker.serve_forever()
 
 

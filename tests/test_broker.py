@@ -1,3 +1,4 @@
+import ssl
 import logging
 import asyncio
 import unittest
@@ -8,7 +9,7 @@ import mqttools
 class BrokerTest(unittest.TestCase):
 
     def create_broker(self):
-        broker = mqttools.Broker('localhost', 0)
+        broker = mqttools.Broker(('localhost', 0))
 
         async def broker_wrapper():
             with self.assertRaises(asyncio.CancelledError):
@@ -1133,6 +1134,18 @@ class BrokerTest(unittest.TestCase):
             broker_task.cancel()
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
+
+    def test_create_broker_addresses(self):
+        asyncio.run(self.create_broker_addresses())
+
+    async def create_broker_addresses(self):
+        mqttools.Broker('localhost')
+        mqttools.Broker(('localhost', 5))
+        mqttools.Broker(('localhost', 10, ssl.create_default_context()))
+        mqttools.Broker([
+            ('localhost', 5),
+            ('localhost', 10, ssl.create_default_context())
+        ])
 
 
 logging.basicConfig(level=logging.DEBUG)

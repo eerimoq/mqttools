@@ -39,7 +39,7 @@ class BrokerThreadTest(unittest.TestCase):
             sock.close()
 
     def test_start_stop(self):
-        broker = mqttools.BrokerThread('localhost', port=BROKER_PORT)
+        broker = mqttools.BrokerThread(('localhost', BROKER_PORT))
 
         with self.assertRaises(ConnectionRefusedError):
             self.connect()

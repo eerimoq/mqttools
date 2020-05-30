@@ -98,7 +98,7 @@ class Client(object):
     async def serve_forever(self):
         addr = self._writer.get_extra_info('peername')
 
-        self.log_info('Serving client %r.', addr)
+        self.log_info('Serving client %s:%d.', *addr)
 
         try:
             packet_type, _, payload = await self.read_packet()
@@ -354,46 +354,79 @@ class Client(object):
         return self._disconnect_reason == DisconnectReasonCode.NORMAL_DISCONNECTION
 
 
+class Server:
+
+    def __init__(self, serve_client, address):
+        self.serve_client = serve_client
+
+        if len(address) == 3:
+            self._ssl = address[2]
+        else:
+            self._ssl = None
+
+        self._host = address[0]
+        self._port = address[1]
+        self.server = None
+        self.ready = asyncio.Event()
+
+    async def serve_forever(self):
+        try:
+            self.server = await asyncio.start_server(self.serve_client,
+                                                     self._host,
+                                                     self._port,
+                                                     ssl=self._ssl)
+        except OSError as e:
+            LOGGER.warning('%s', e)
+            raise
+
+        self.ready.set()
+        server_address = self.server.sockets[0].getsockname()
+
+        LOGGER.info('Listening for clients on %s:%d.', *server_address)
+
+        async with self.server:
+            await self.server.serve_forever()
+
+
 class Broker(object):
     """A limited MQTT version 5.0 broker.
 
-    `host`, `port` and `secure_port` are the host and ports to listen
-    for clients on.
-
-    `secure_ssl` is an SSL context passed to `asyncio.start_server()`
-    as `ssl`.
+    `addresses` is a list of ``(host, port)`` and ``(host, port,
+    ssl)`` tuples. It may also be the host string or one of the
+    tuples. The broker will listen for clients on all given
+    addresses. ``ssl`` is an SSL context passed to
+    `asyncio.start_server()` as `ssl`.
 
     Create a broker and serve clients:
 
-    >>> broker = Broker('broker.hivemq.com')
+    >>> broker = Broker('localhost')
     >>> await broker.serve_forever()
 
     """
 
-    def __init__(self, host, port=1883, secure_port=8883, secure_ssl=None):
-        self._host = host
-        self._port = port
-        self._secure_port = secure_port
-        self._secure_ssl = secure_ssl
+    def __init__(self, addresses):
+        if isinstance(addresses, str):
+            addresses = (addresses, 1883)
+
+        if isinstance(addresses, tuple):
+            addresses = [addresses]
+
         self._sessions = {}
         self._subscribers = defaultdict(list)
         self._wildcard_subscribers = []
-        self._listener = None
-        self._listener_ready = asyncio.Event()
-        self._secure_listener = None
-        self._secure_listener_ready = asyncio.Event()
+        self._servers = []
+
+        for address in addresses:
+            self._servers.append(Server(self.serve_client, address))
+
         self._client_tasks = set()
         self._retained_messages = {}
 
-    async def getsockname(self):
-        await self._listener_ready.wait()
+    async def getsockname(self, index=0):
+        server = self._servers[index]
+        await server.ready.wait()
 
-        return self._listener.sockets[0].getsockname()
-
-    async def secure_getsockname(self):
-        await self._secure_listener_ready.wait()
-
-        return self._secure_listener.sockets[0].getsockname()
+        return server.server.sockets[0].getsockname()
 
     async def serve_forever(self):
         """Setup a listener socket and forever serve clients. This coroutine
@@ -403,9 +436,7 @@ class Broker(object):
 
         try:
             await asyncio.gather(
-                self.insecure_serve_forever(),
-                self.secure_serve_forever()
-            )
+                *[server.serve_forever() for server in self._servers])
         except asyncio.CancelledError:
             # Cancel all client tasks as the TCP server leaves them
             # running.
@@ -414,34 +445,6 @@ class Broker(object):
 
             self._client_tasks = set()
             raise
-
-    async def insecure_serve_forever(self):
-        self._listener = await asyncio.start_server(self.serve_client,
-                                                    self._host,
-                                                    self._port)
-        self._listener_ready.set()
-        listener_address = self._listener.sockets[0].getsockname()
-
-        LOGGER.info('Listening for clients on %s.', listener_address)
-
-        async with self._listener:
-            await self._listener.serve_forever()
-
-    async def secure_serve_forever(self):
-        if self._secure_ssl is None:
-            return
-
-        self._secure_listener = await asyncio.start_server(self.serve_client,
-                                                           self._host,
-                                                           self._secure_port,
-                                                           ssl=self._secure_ssl)
-        self._secure_listener_ready.set()
-        listener_address = self._secure_listener.sockets[0].getsockname()
-
-        LOGGER.info('Listening for secure clients on %s.', listener_address)
-
-        async with self._secure_listener:
-            await self._secure_listener.serve_forever()
 
     async def serve_client(self, reader, writer):
         current_task = asyncio.current_task()
@@ -560,10 +563,9 @@ class BrokerThread(threading.Thread):
 
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, addresses):
         super().__init__()
-        self._args = args
-        self._kwargs = kwargs
+        self._addresses = addresses
         self.daemon = True
         self._loop = asyncio.new_event_loop()
         self._broker_task = self._loop.create_task(self._run())
@@ -596,7 +598,7 @@ class BrokerThread(threading.Thread):
         self.join()
 
     async def _run(self):
-        broker = Broker(*self._args, **self._kwargs)
+        broker = Broker(self._addresses)
 
         try:
             await broker.serve_forever()

@@ -5,15 +5,16 @@ from ..broker import Broker
 
 
 def _do_broker(args):
+    addresses = [(args.host, args.port)]
+
     if all([args.cafile, args.certfile, args.keyfile]):
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH,
                                              cafile=args.cafile)
         context.check_hostname = not args.no_check_hostname
         context.load_cert_chain(certfile=args.certfile, keyfile=args.keyfile)
-    else:
-        context = None
+        addresses.append((args.host, args.secure_port, context))
 
-    broker = Broker(args.host, args.port, args.secure_port, secure_ssl=context)
+    broker = Broker(addresses)
     asyncio.run(broker.serve_forever())
 
 
