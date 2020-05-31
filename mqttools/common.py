@@ -948,7 +948,7 @@ def format_connect_compact(payload):
         parts.append(f'WillTopic={will_topic}')
 
     if will_message is not None:
-        parts.append(f'WillMessage={will_message}')
+        parts.append(f'WillMessage={hexlify(will_message)}')
 
     parts.append(f'KeepAlive={keep_alive_s}')
 

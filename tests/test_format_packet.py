@@ -25,6 +25,23 @@ class FormatPacketTest(unittest.TestCase):
                 'Received CONNECT(1): ClientId=goo, KeepAlive=1'
             ),
             (
+                b'\x10\x1a\x00\x04MQTT\x05\x06\x00\x00\x00\x00\x02id\x00\x00'
+                b'\x03foo\x00\x03bar',
+                [
+                    'Received CONNECT(1) packet of 28 byte(s)',
+                    '  ClientId:    id',
+                    '  CleanStart:  True',
+                    '  WillTopic:   foo',
+                    '  WillMessage: 626172',
+                    '  WillRetain:  False',
+                    '  KeepAlive:   0',
+                    '  UserName:    None',
+                    '  Password:    None'
+                ],
+                'Received CONNECT(1): ClientId=id, WillTopic=foo, '
+                'WillMessage=626172, KeepAlive=0'
+            ),
+            (
                 b'\x20\x03\x00\x00\x00',
                 [
                     'Received CONNACK(2) packet of 5 byte(s)',
