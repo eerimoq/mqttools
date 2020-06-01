@@ -382,7 +382,7 @@ class Server:
         self.ready.set()
         server_address = self.server.sockets[0].getsockname()
 
-        LOGGER.info('Listening for clients on %s:%d.', *server_address)
+        LOGGER.info('Listening for clients on %s.', server_address)
 
         async with self.server:
             await self.server.serve_forever()
