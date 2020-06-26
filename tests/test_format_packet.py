@@ -152,3 +152,14 @@ class FormatPacketTest(unittest.TestCase):
             self.assertEqual(
                 mqttools.common.format_packet_compact('Received', message),
                 compact_lines)
+
+    def test_format_malformed_publish(self):
+        message = b'\x30\x07\x00\x01\xff\x00apa'
+
+        lines = mqttools.common.format_packet('Received', message)
+        self.assertIn('  *** Malformed packet (', lines[1])
+        self.assertEqual(lines[2], '')
+        self.assertEqual(lines[3], '    Traceback (most recent call last):')
+
+        line = mqttools.common.format_packet_compact('Received', message)
+        self.assertIn('*** Malformed packet', line)

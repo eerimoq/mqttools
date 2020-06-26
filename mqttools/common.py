@@ -4,6 +4,7 @@ import enum
 from io import BytesIO
 import bitstruct
 import binascii
+import traceback
 
 
 # Connection flags.
@@ -927,6 +928,9 @@ def format_packet(prefix, packet):
             lines += format_disconnect(payload)
     except Exception as e:
         lines.append(f'  *** Malformed packet ({e}) ***')
+        lines.append('')
+        lines += [f'    {line}' for line in traceback.format_exc().splitlines()]
+        lines.append('')
 
     return lines
 
