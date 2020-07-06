@@ -3,10 +3,10 @@ import asyncio
 import time
 import binascii
 from humanfriendly import format_timespan
+from argparse_addons import Integer
 
 from ..client import Client
 from ..common import Error
-from . import to_int
 
 
 def encode_message(message):
@@ -108,19 +108,19 @@ def add_subparser(subparsers):
                            default='localhost',
                            help='Broker host (default: %(default)s).')
     subparser.add_argument('--port',
-                           type=int,
+                           type=Integer(0),
                            default=1883,
                            help='Broker port (default: %(default)s).')
     subparser.add_argument('--client-id',
                            help='Client id (default: mqttools-<UUID[0..14]>).')
     subparser.add_argument(
         '--count',
-        type=int,
+        type=Integer(0),
         default=1,
         help='Number of times to publish the message (default: %(default)s).')
     subparser.add_argument(
         '--size',
-        type=int,
+        type=Integer(0),
         default=10,
         help='Generated message size (default: %(default)s).')
     subparser.add_argument('--retain',
@@ -133,8 +133,8 @@ def add_subparser(subparsers):
                            help='Retain the will message.')
     subparser.add_argument(
         '--session-expiry-interval',
+        type=Integer(0, 0xffffffff),
         default=0,
-        type=to_int,
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
     subparser.add_argument(
         '--cafile',

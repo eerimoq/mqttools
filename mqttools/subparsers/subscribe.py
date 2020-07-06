@@ -1,9 +1,9 @@
 import ssl
 import asyncio
+from argparse_addons import Integer
 
 from ..client import Client
 from ..common import hexlify
-from . import to_int
 
 
 async def subscriber(host,
@@ -68,13 +68,13 @@ def add_subparser(subparsers):
                            default='localhost',
                            help='Broker host (default: %(default)s).')
     subparser.add_argument('--port',
-                           type=int,
+                           type=Integer(0),
                            default=1883,
                            help='Broker port (default: %(default)s).')
     subparser.add_argument('--client-id',
                            help='Client id (default: mqttools-<UUID[0..14]>).')
     subparser.add_argument('--keep-alive',
-                           type=int,
+                           type=Integer(0),
                            default=0,
                            help=('Keep alive time in seconds (default: '
                                  '%(default)s). Give as 0 to disable keep '
@@ -82,7 +82,7 @@ def add_subparser(subparsers):
     subparser.add_argument(
         '--session-expiry-interval',
         default=0,
-        type=to_int,
+        type=Integer(0, 0xffffffff),
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
     subparser.add_argument(
         '--cafile',

@@ -29,7 +29,8 @@ setuptools.setup(
     install_requires=[
         'bitstruct',
         'humanfriendly',
-        'windows-curses;platform_system=="Windows"'
+        'windows-curses;platform_system=="Windows"',
+        'argparse_addons'
     ],
     test_suite="tests",
     entry_points={

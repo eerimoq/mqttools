@@ -1,5 +1,6 @@
 import asyncio
 import ssl
+from argparse_addons import Integer
 
 from ..broker import Broker
 
@@ -25,11 +26,11 @@ def add_subparser(subparsers):
                            default='localhost',
                            help="Broker host (default: %(default)s).")
     subparser.add_argument('--port',
-                           type=int,
+                           type=Integer(0),
                            default=1883,
                            help='Broker port (default: %(default)s).')
     subparser.add_argument('--secure-port',
-                           type=int,
+                           type=Integer(0),
                            default=8883,
                            help='Secure broker port (default: %(default)s).')
     subparser.add_argument(
