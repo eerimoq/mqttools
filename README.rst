@@ -117,6 +117,8 @@ The menu at the bottom of the monitor shows the available commands.
 
 - Play/Pause: Toggle between playing and paused (or running and freezed).
 
+- Format: Message formatting; `auto`, `binary` or `text`.
+
 Broker
 ^^^^^^
 
