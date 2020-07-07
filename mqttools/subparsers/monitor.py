@@ -72,8 +72,10 @@ class Monitor(object):
     def __init__(self, stdscr, args):
         self._stdscr = stdscr
         self._sorted_topics = []
+        self._messages = {}
         self._formatted_messages = {}
         self._playing = True
+        self._format = 'auto'
         self._modified = True
         self._queue = Queue()
         self._nrows, self._ncols = stdscr.getmaxyx()
@@ -135,7 +137,7 @@ class Monitor(object):
     def draw_menu(self, row):
         self.addstr_color(row,
                           0,
-                          self.stretch('q: Quit, p: Play/Pause'),
+                          self.stretch(f'q: Quit, p: Play/Pause, f: Format ({self._format})'),
                           curses.color_pair(2))
 
     def addstr(self, row, col, text):
@@ -166,16 +168,35 @@ class Monitor(object):
             raise QuitError()
         elif key == 'p':
             self._playing = not self._playing
+        elif key == 'f':
+            self._format = {
+                'auto': 'binary',
+                'binary': 'text',
+                'text': 'auto'
+            }[self._format]
 
-    def try_update_message(self):
-        timestamp, topic, message = self._queue.get_nowait()
+            for topic, (timestamp, message) in self._messages.items():
+                self.format_message(timestamp, topic, message)
 
-        if topic is None:
-            sys.exit('Broker connection lost!')
+            self._modified = True
 
+    def format_message(self, timestamp, topic, message):
         lines = []
         row_length = max(1, self._ncols - 12)
-        message = hexlify(message)
+
+        if self._format == 'auto':
+            try:
+                message = message.decode()
+            except UnicodeDecodeError:
+                message = hexlify(message)
+        elif self._format == 'binary':
+            message = hexlify(message)
+        elif self._format == 'text':
+            message = message.decode(errors='replace')
+        else:
+            message = ''
+
+        message = message.replace('\x00', '\\x00')
 
         for i in range(0, len(message), row_length):
             lines.append(message[i:i + row_length])
@@ -183,6 +204,15 @@ class Monitor(object):
         formatted = [' {}  {}'.format(timestamp, topic)]
         formatted += [11 * ' ' + line for line in lines]
         self._formatted_messages[topic] = formatted
+
+    def try_update_message(self):
+        timestamp, topic, message = self._queue.get_nowait()
+
+        if topic is None:
+            sys.exit('Broker connection lost!')
+
+        self.format_message(timestamp, topic, message)
+        self._messages[topic] = (timestamp, message)
 
         if topic not in self._sorted_topics:
             self.insort(topic)
