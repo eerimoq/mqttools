@@ -71,11 +71,11 @@ messages are printed to standard output.
 
    $ mqttools subscribe /test/#
    Connecting to 'localhost:1883'.
-
+   Connected.
    Topic:   /test
-   Message: 3131
+   Message: 11
    Topic:   /test/mqttools/foo
-   Message: 626172
+   Message: bar
 
 Publish
 ^^^^^^^
@@ -84,7 +84,7 @@ Connect to given MQTT broker and publish a message to a topic.
 
 .. code-block:: text
 
-   $ mqttools publish /test/mqttools/foo 626172
+   $ mqttools publish /test/mqttools/foo bar
    Connecting to 'localhost:1883'.
 
    Published 1 message(s) in 0 seconds from 1 concurrent task(s).

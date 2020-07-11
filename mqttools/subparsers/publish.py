@@ -9,14 +9,26 @@ from ..client import Client
 from ..common import Error
 
 
-def encode_message(message):
+def encode_binary(message):
     try:
         return binascii.unhexlify(message)
     except ValueError:
         raise Error(f"Invalid hex string '{message}'.")
 
 
-def create_message(message, size, number, fmt):
+def encode_message(message, kind):
+    if kind == 'auto':
+        try:
+            return binascii.unhexlify(message)
+        except ValueError:
+            return message.encode()
+    elif kind == 'binary':
+        return encode_binary(message)
+    else:
+        return message.encode()
+
+
+def create_message(message, message_format, size, number, fmt):
     if message is None:
         message_bytes = fmt.format(number).encode('ascii')
         extra = (size - len(message_bytes))
@@ -26,7 +38,7 @@ def create_message(message, size, number, fmt):
         else:
             message_bytes = message_bytes[:size]
     else:
-        message_bytes = encode_message(message)
+        message_bytes = encode_message(message, message_format)
 
     return message_bytes
 
@@ -41,12 +53,13 @@ async def publisher(host,
                     will_message,
                     will_retain,
                     session_expiry_interval,
+                    message_format,
                     cafile,
                     check_hostname,
                     topic,
                     message):
     if will_message is not None:
-        will_message = encode_message(will_message)
+        will_message = encode_message(will_message, message_format)
 
     if cafile:
         print(f"CA File:  '{cafile}'")
@@ -75,7 +88,7 @@ async def publisher(host,
     start_time = time.time()
 
     for number in range(count):
-        message_bytes = create_message(message, size, number, fmt)
+        message_bytes = create_message(message, message_format, size, number, fmt)
         client.publish(topic, message_bytes, retain=retain)
 
     elapsed_time = format_timespan(time.time() - start_time)
@@ -95,6 +108,7 @@ def _do_publish(args):
                           args.will_message,
                           args.will_retain,
                           args.session_expiry_interval,
+                          args.message_format,
                           args.cafile,
                           not args.no_check_hostname,
                           args.topic,
@@ -136,6 +150,11 @@ def add_subparser(subparsers):
         type=Integer(0, 0xffffffff),
         default=0,
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
+    subparser.add_argument(
+        '--message-format',
+        choices=('auto', 'binary', 'text'),
+        default='auto',
+        help='Message format (default: %(default)s).')
     subparser.add_argument(
         '--cafile',
         default='',
