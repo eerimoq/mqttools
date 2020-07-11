@@ -3,7 +3,7 @@ import asyncio
 from argparse_addons import Integer
 
 from ..client import Client
-from ..common import hexlify
+from . import format_message
 
 
 async def subscriber(host,
@@ -13,7 +13,8 @@ async def subscriber(host,
                      client_id,
                      topic,
                      keep_alive_s,
-                     session_expiry_interval):
+                     session_expiry_interval,
+                     message_format):
     if cafile:
         print(f"CA File:  '{cafile}'")
         print(f"Check hostname: {check_hostname}")
@@ -45,7 +46,7 @@ async def subscriber(host,
                 break
 
             print(f'Topic:   {topic}')
-            print(f'Message: {hexlify(message)}')
+            print(f'Message: {format_message(message_format, message)}')
 
         await client.stop()
 
@@ -58,7 +59,8 @@ def _do_subscribe(args):
                            args.client_id,
                            args.topic,
                            args.keep_alive,
-                           args.session_expiry_interval))
+                           args.session_expiry_interval,
+                           args.message_format))
 
 
 def add_subparser(subparsers):
@@ -84,6 +86,11 @@ def add_subparser(subparsers):
         default=0,
         type=Integer(0, 0xffffffff),
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
+    subparser.add_argument(
+        '--message-format',
+        choices=('auto', 'binary', 'text'),
+        default='auto',
+        help='Message format (default: %(default)s).')
     subparser.add_argument(
         '--cafile',
         default='',

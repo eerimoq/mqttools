@@ -10,7 +10,7 @@ from queue import Empty as QueueEmpty
 from argparse_addons import Integer
 
 from ..client import Client
-from ..common import hexlify
+from . import format_message
 
 
 class QuitError(Exception):
@@ -183,19 +183,7 @@ class Monitor(object):
     def format_message(self, timestamp, topic, message):
         lines = []
         row_length = max(1, self._ncols - 12)
-
-        if self._format == 'auto':
-            try:
-                message = message.decode()
-            except UnicodeDecodeError:
-                message = hexlify(message)
-        elif self._format == 'binary':
-            message = hexlify(message)
-        elif self._format == 'text':
-            message = message.decode(errors='replace')
-        else:
-            message = ''
-
+        message = format_message(self._format, message)
         message = message.replace('\x00', '\\x00')
 
         for i in range(0, len(message), row_length):
