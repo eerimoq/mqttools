@@ -29,7 +29,18 @@ class ClientThread(threading.Thread):
         self._client_id = args.client_id
         self._keep_alive_s = args.keep_alive
         self._session_expiry_interval = args.session_expiry_interval
-        self._topics = args.subscribe
+        self._subscriptions = []
+
+        retain_handling = args.retain_handling[:len(args.subscribe)]
+
+        if not retain_handling:
+            retain_handling = [0]
+
+        remaining = len(args.subscribe) - len(retain_handling)
+        retain_handling += remaining * [retain_handling[-1]]
+
+        for topic, retain_handling in zip(args.subscribe, retain_handling):
+            self._subscriptions.append((topic, retain_handling))
 
     async def main(self):
         if self._cafile:
@@ -46,7 +57,7 @@ class ClientThread(threading.Thread):
                         self._client_id,
                         keep_alive_s=self._keep_alive_s,
                         session_expiry_interval=self._session_expiry_interval,
-                        subscriptions=self._topics,
+                        subscriptions=self._subscriptions,
                         topic_alias_maximum=10,
                         ssl=context)
 
@@ -279,7 +290,15 @@ def add_subparser(subparsers):
         action='store_true',
         help='Do not check certificate hostname.')
     subparser.add_argument(
+        '--retain-handling',
+        type=Integer(0, 2),
+        default=[],
+        action='append',
+        help=('Retain handling for the subscriptions. May be given once for each '
+              'subscription. Last known value is used for remaining topics '
+              '(default: 0).'))
+    subparser.add_argument(
         'subscribe',
-        nargs='*',
+        nargs='+',
         help='Subscribe to given topic(s) <topic>.')
     subparser.set_defaults(func=_do_monitor)

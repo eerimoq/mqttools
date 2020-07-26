@@ -14,6 +14,7 @@ async def subscriber(host,
                      topic,
                      keep_alive_s,
                      session_expiry_interval,
+                     retain_handling,
                      message_format):
     if cafile:
         print(f"CA File:  '{cafile}'")
@@ -29,7 +30,7 @@ async def subscriber(host,
                     client_id,
                     keep_alive_s=keep_alive_s,
                     session_expiry_interval=session_expiry_interval,
-                    subscriptions=[topic],
+                    subscriptions=[(topic, retain_handling)],
                     topic_alias_maximum=10,
                     ssl=context)
 
@@ -60,6 +61,7 @@ def _do_subscribe(args):
                            args.topic,
                            args.keep_alive,
                            args.session_expiry_interval,
+                           args.retain_handling,
                            args.message_format))
 
 
@@ -75,17 +77,22 @@ def add_subparser(subparsers):
                            help='Broker port (default: %(default)s).')
     subparser.add_argument('--client-id',
                            help='Client id (default: mqttools-<UUID[0..14]>).')
-    subparser.add_argument('--keep-alive',
-                           type=Integer(0),
-                           default=0,
-                           help=('Keep alive time in seconds (default: '
-                                 '%(default)s). Give as 0 to disable keep '
-                                 'alive.'))
+    subparser.add_argument(
+        '--keep-alive',
+        type=Integer(0),
+        default=0,
+        help=('Keep alive time in seconds (default: %(default)s). Give as 0 to '
+              'disable keep alive.'))
     subparser.add_argument(
         '--session-expiry-interval',
         default=0,
         type=Integer(0, 0xffffffff),
         help='Session expiry interval in the range 0..0xffffffff (default: %(default)s).')
+    subparser.add_argument(
+        '--retain-handling',
+        type=Integer(0, 2),
+        default=0,
+        help='Retain handling for the subscriptions (default: %(default)s).')
     subparser.add_argument(
         '--message-format',
         choices=('auto', 'binary', 'text'),

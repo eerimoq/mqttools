@@ -605,14 +605,14 @@ def unpack_disconnect(payload):
     return reason, properties
 
 
-def pack_subscribe(topic, packet_identifier):
+def pack_subscribe(topic, retain_handling, packet_identifier):
     packed_topic = pack_string(topic)
     packed = pack_fixed_header(ControlPacketType.SUBSCRIBE,
                                2,
                                len(packed_topic) + 4)
     packed += struct.pack('>HB', packet_identifier, 0)
     packed += packed_topic
-    packed += struct.pack('B', 0)
+    packed += struct.pack('B', retain_handling << 4)
 
     return packed
 

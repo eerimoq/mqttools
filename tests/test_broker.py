@@ -1010,7 +1010,7 @@ class BrokerTest(unittest.TestCase):
             publish = await reader_1.readexactly(11)
             self.assertEqual(
                 publish,
-                b'\x30\x09\x00\x03a/b\x00fie')
+                b'\x31\x09\x00\x03a/b\x00fie')
 
             broker_task.cancel()
 
@@ -1055,12 +1055,12 @@ class BrokerTest(unittest.TestCase):
             publish = await reader_2.readexactly(12)
             self.assertEqual(
                 publish,
-                b'\x30\x0a\x00\x04/a/b\x00apa')
+                b'\x31\x0a\x00\x04/a/b\x00apa')
 
             writer_2.close()
 
             # Publish the same topic with retain set with no data to
-            # remove the retained message from the broker..
+            # remove the retained message from the broker.
             publish = b'\x31\x07\x00\x04/a/b\x00'
             writer_1.write(publish)
 

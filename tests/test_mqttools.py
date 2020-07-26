@@ -152,6 +152,38 @@ class MQTToolsTest(unittest.TestCase):
         self.assertEqual(message, b'apa')
         self.run_until_complete(client.stop())
 
+    def test_subscribe_retain_handling_values(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # SUBSCRIBE retain handling 0
+            ('c2s', b'\x82\n\x00\x01\x00\x00\x04/a/b\x00'),
+            # SUBACK
+            ('s2c', b'\x90\x04\x00\x01\x00\x00'),
+            # SUBSCRIBE retain handling 1
+            ('c2s', b'\x82\n\x00\x02\x00\x00\x04/a/c\x10'),
+            # SUBACK
+            ('s2c', b'\x90\x04\x00\x02\x00\x00'),
+            # SUBSCRIBE retain handling 2
+            ('c2s', b'\x82\n\x00\x03\x00\x00\x04/a/d\x20'),
+            # SUBACK
+            ('s2c', b'\x90\x04\x00\x03\x00\x00'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        client = mqttools.Client(*self.broker.address,
+                                 'bar',
+                                 keep_alive_s=0,
+                                 topic_alias_maximum=0)
+        self.run_until_complete(client.start())
+        self.run_until_complete(client.subscribe('/a/b', 0))
+        self.run_until_complete(client.subscribe('/a/c', 1))
+        self.run_until_complete(client.subscribe('/a/d', 2))
+        self.run_until_complete(client.stop())
+
     def test_unsubscribe(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT

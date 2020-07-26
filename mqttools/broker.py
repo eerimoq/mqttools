@@ -282,7 +282,7 @@ class Client(object):
         self._write_packet(pack_suback(packet_identifier, reasons))
 
         for topic, message in retained_messages:
-            self.publish(topic, message)
+            self.publish(topic, message, True)
 
     def on_unsubscribe(self, payload):
         packet_identifier, topics = unpack_unsubscribe(payload)
@@ -313,8 +313,8 @@ class Client(object):
 
         raise DisconnectError()
 
-    def publish(self, topic, message):
-        self._write_packet(pack_publish(topic, message, False, None))
+    def publish(self, topic, message, retain=False):
+        self._write_packet(pack_publish(topic, message, retain, None))
 
     def disconnect(self):
         self._write_packet(pack_disconnect(self._disconnect_reason))

@@ -198,10 +198,14 @@ class Client(object):
             self._connect_properties[PropertyIds.SESSION_EXPIRY_INTERVAL] = (
                 session_expiry_interval)
 
-        if subscriptions is None:
-            subscriptions = []
+        self._subscriptions = []
 
-        self._subscriptions = subscriptions
+        if subscriptions is not None:
+            for subscription in subscriptions:
+                if isinstance(subscription, str):
+                    self._subscriptions.append((subscription, 0))
+                else:
+                    self._subscriptions.append(subscription)
 
         if connect_delays is None:
             connect_delays = [1, 2, 4, 8]
@@ -261,7 +265,7 @@ class Client(object):
 
         return self._messages
 
-    async def on_message(self, topic, message):
+    async def on_message(self, topic, message, retain, properties):
         """Called for each received MQTT message and when the broker
         connection is lost. Puts the message on the messages queue by
         default.
@@ -371,8 +375,9 @@ class Client(object):
                 self._keep_alive_task = asyncio.create_task(self._keep_alive_main())
 
             if not resume_session or not session_present:
-                for topic in self._subscriptions:
-                    await self.subscribe(topic)
+                for topic, retain_handling in self._subscriptions:
+                    await self.subscribe(topic, retain_handling)
+
         except (Exception, asyncio.CancelledError):
             await self.stop()
             raise
@@ -465,8 +470,14 @@ class Client(object):
         self._write_packet(pack_disconnect(self._disconnect_reason))
         self._disconnect_reason = None
 
-    async def subscribe(self, topic):
+    async def subscribe(self, topic, retain_handling=0):
         """Subscribe to given topic with QoS 0.
+
+        `retain_handling` controls the the retain handling. May be 0,
+        1 or 2. If 0, all retained messages matching given topic
+        filter are received. If 1, same as 0, but only if the topic
+        filter did not already exist. If 2, no retained messages are
+        received.
 
         Raises :class:`TimeoutError` if the broker does not
         acknowledge the subscribe request.
@@ -482,6 +493,7 @@ class Client(object):
 
         with Transaction(self) as transaction:
             self._write_packet(pack_subscribe(topic,
+                                              retain_handling,
                                               transaction.packet_identifier))
 
             try:
@@ -570,7 +582,7 @@ class Client(object):
                              alias)
                 return
 
-        await self.on_message(topic, message)
+        await self.on_message(topic, message, bool(flags & 1), properties)
 
     def on_suback(self, payload):
         packet_identifier, properties, reasons = unpack_suback(payload)
@@ -716,4 +728,4 @@ class Client(object):
     async def _close(self):
         self.disconnect()
         self._writer.close()
-        await self.on_message(None, None)
+        await self.on_message(None, None, None, None)
