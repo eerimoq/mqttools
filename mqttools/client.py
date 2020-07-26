@@ -122,8 +122,8 @@ class Client(object):
     ends. Give as 0xffffffff to never remove the session (given that
     the broker supports it).
 
-    `subscriptions` is a list of topics to subscribe to after
-    connected in :meth:`start()`.
+    `subscriptions` is a list of topics and topic-retain-handling
+    tuples to subscribe to after connected in :meth:`start()`.
 
     `connect_delays` is a list of delays in seconds between the
     connection attempts in :meth:`start()`. Each delay is used once,
@@ -150,7 +150,7 @@ class Client(object):
                         topic_aliases=['/my/topic']',
                         topic_alias_maximum=100,
                         session_expiry_interval=1800,
-                        subscriptions=['a/b', 'test/#'],
+                        subscriptions=['a/b', ('test/#', 2)],
                         connect_delays=[1, 2],
                         ssl=True)
 
