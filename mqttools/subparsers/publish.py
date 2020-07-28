@@ -70,31 +70,30 @@ async def publisher(host,
     else:
         context = None
 
-    client = Client(host,
-                    port,
-                    client_id,
-                    will_topic=will_topic,
-                    will_message=will_message,
-                    will_retain=will_retain,
-                    session_expiry_interval=session_expiry_interval,
-                    ssl=context)
-
     print(f"Connecting to '{host}:{port}'.")
     print()
 
-    await client.start()
+    async with Client(host,
+                      port,
+                      client_id,
+                      will_topic=will_topic,
+                      will_message=will_message,
+                      will_retain=will_retain,
+                      session_expiry_interval=session_expiry_interval,
+                      ssl=context) as client:
+        fmt = '{{:0{}}}'.format(len(str(count - 1)))
+        start_time = time.time()
 
-    fmt = '{{:0{}}}'.format(len(str(count - 1)))
-    start_time = time.time()
+        for number in range(count):
+            message_bytes = create_message(message,
+                                           message_format,
+                                           size,
+                                           number,
+                                           fmt)
+            client.publish(topic, message_bytes, retain=retain)
 
-    for number in range(count):
-        message_bytes = create_message(message, message_format, size, number, fmt)
-        client.publish(topic, message_bytes, retain=retain)
-
-    elapsed_time = format_timespan(time.time() - start_time)
-    print(f'Published {count} message(s) in {elapsed_time}.')
-
-    await client.stop()
+        elapsed_time = format_timespan(time.time() - start_time)
+        print(f'Published {count} message(s) in {elapsed_time}.')
 
 
 def _do_publish(args):
