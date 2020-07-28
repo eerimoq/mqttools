@@ -110,6 +110,25 @@ class MQTToolsTest(unittest.TestCase):
         self.run_until_complete(client.start())
         self.run_until_complete(client.stop())
 
+    def test_empty_context_manager(self):
+        Broker.EXPECTED_DATA_STREAM = [
+            # CONNECT
+            ('c2s', b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03bar'),
+            # CONNACK
+            ('s2c', b'\x20\x03\x00\x00\x00'),
+            # DISCONNECT
+            ('c2s', b'\xe0\x02\x00\x00')
+        ]
+
+        async def manager():
+            async with mqttools.Client(*self.broker.address,
+                                       'bar',
+                                       keep_alive_s=0,
+                                       topic_alias_maximum=0):
+                pass
+
+        self.run_until_complete(manager())
+
     def test_subscribe(self):
         Broker.EXPECTED_DATA_STREAM = [
             # CONNECT

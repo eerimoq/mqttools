@@ -172,11 +172,8 @@ An example connecting to an MQTT broker and publishing the message
    import mqttools
 
    async def publisher():
-       client = mqttools.Client('localhost', 1883)
-
-       await client.start()
-       client.publish('/test/mqttools/foo', b'bar')
-       await client.stop()
+       async with mqttools.Client('localhost', 1883) as client:
+           client.publish('/test/mqttools/foo', b'bar')
 
    asyncio.run(publisher())
 

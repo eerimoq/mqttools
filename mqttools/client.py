@@ -154,6 +154,11 @@ class Client(object):
                         connect_delays=[1, 2],
                         ssl=True)
 
+    Use an async context manager for automatic start and stop:
+
+    >>> async with Client('broker.hivemq.com', 1883) as client:
+    ...     client.publish('foo', b'bar')
+
     """
 
     def __init__(self,
@@ -343,6 +348,14 @@ class Client(object):
                 attempt)
             await asyncio.sleep(delay)
             attempt += 1
+
+    async def __aenter__(self):
+        await self.start()
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, exc_traceback):
+        await self.stop()
 
     async def _start(self, resume_session=False):
         self._rx_topic_aliases = {}
