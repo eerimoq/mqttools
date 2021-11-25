@@ -831,7 +831,6 @@ def format_publish(flags, payload):
         f'  Retain:     {retain}',
         f'  Topic:      {topic}',
         f'  Message:    {hexlify(message)}',
-        '  Properties:'
     ] + format_properties(properties)
 
 
@@ -859,7 +858,6 @@ def format_suback(payload):
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        '  Properties:'
     ] + format_properties(properties) + [
         '  Reasons:'
     ] + [
@@ -881,7 +879,6 @@ def format_unsuback(payload):
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        '  Properties:'
     ] + format_properties(properties) + [
         '  Reasons:'
     ] + [
@@ -894,7 +891,6 @@ def format_disconnect(payload):
 
     return [
         f'  Reason:     {reason.name}({reason.value})',
-        '  Properties:'
     ] + format_properties(properties)
 
 
