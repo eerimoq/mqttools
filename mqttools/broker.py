@@ -98,7 +98,7 @@ class Client(object):
     async def serve_forever(self):
         addr = self._writer.get_extra_info('peername')
 
-        self.log_info('Serving client %s:%d.', *addr)
+        self.log_info('Serving client %s:%d.', addr[0], addr[1])
 
         try:
             packet_type, _, payload = await self.read_packet()
