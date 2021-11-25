@@ -1,16 +1,15 @@
-import sys
-import logging
 import asyncio
-import unittest
-import threading
 import binascii
+import logging
 import queue
 import socket
-from unittest.mock import patch
+import sys
+import threading
+import unittest
 from io import StringIO
+from unittest.mock import patch
 
 import mqttools
-
 
 HOST = 'localhost'
 PORT = 0

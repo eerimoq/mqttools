@@ -1,6 +1,6 @@
 import asyncio
-import mqttools
 
+import mqttools
 
 HOST = 'localhost'
 PORT = 1883

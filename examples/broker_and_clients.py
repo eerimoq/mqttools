@@ -8,10 +8,10 @@
 
 """
 
-import time
 import asyncio
-import mqttools
+import time
 
+import mqttools
 
 BROKER_PORT = 10008
 

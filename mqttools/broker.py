@@ -1,33 +1,32 @@
-import re
 import asyncio
 import logging
+import re
 import threading
 from collections import defaultdict
 
-from .common import ControlPacketType
-from .common import ConnectReasonCode
-from .common import SubackReasonCode
-from .common import UnsubackReasonCode
-from .common import DisconnectReasonCode
-from .common import PropertyIds
-from .common import MalformedPacketError
-from .common import PayloadReader
-from .common import unpack_connect
-from .common import pack_connack
-from .common import pack_publish
-from .common import unpack_publish
-from .common import unpack_subscribe
-from .common import pack_suback
-from .common import unpack_unsubscribe
-from .common import pack_unsuback
-from .common import pack_pingresp
-from .common import pack_disconnect
-from .common import unpack_disconnect
-from .common import format_packet
-from .common import format_packet_compact
 from .common import CF_FIXED_HEADER
 from .common import MAXIMUM_PACKET_SIZE
-
+from .common import ConnectReasonCode
+from .common import ControlPacketType
+from .common import DisconnectReasonCode
+from .common import MalformedPacketError
+from .common import PayloadReader
+from .common import PropertyIds
+from .common import SubackReasonCode
+from .common import UnsubackReasonCode
+from .common import format_packet
+from .common import format_packet_compact
+from .common import pack_connack
+from .common import pack_disconnect
+from .common import pack_pingresp
+from .common import pack_publish
+from .common import pack_suback
+from .common import pack_unsuback
+from .common import unpack_connect
+from .common import unpack_disconnect
+from .common import unpack_publish
+from .common import unpack_subscribe
+from .common import unpack_unsubscribe
 
 LOGGER = logging.getLogger(__name__)
 

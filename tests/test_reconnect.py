@@ -1,12 +1,11 @@
-import logging
 import asyncio
-import unittest
-import threading
+import logging
 import queue
 import socket
+import threading
+import unittest
 
 import mqttools
-
 
 HOST = 'localhost'
 PORT = 0

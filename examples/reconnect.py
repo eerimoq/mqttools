@@ -1,6 +1,7 @@
 import asyncio
-import mqttools
 import logging
+
+import mqttools
 
 
 async def handle_messages(client):

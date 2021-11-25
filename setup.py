@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import re
+
 import setuptools
 from setuptools import find_packages
 

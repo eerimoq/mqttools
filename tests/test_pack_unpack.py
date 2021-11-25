@@ -1,16 +1,16 @@
 import unittest
 
+from mqttools.common import MalformedPacketError
+from mqttools.common import PayloadReader
+from mqttools.common import PropertyIds
+from mqttools.common import pack_binary
 from mqttools.common import pack_connect
+from mqttools.common import pack_string
 from mqttools.common import pack_u8
 from mqttools.common import pack_u16
 from mqttools.common import pack_u32
-from mqttools.common import pack_binary
-from mqttools.common import pack_string
 from mqttools.common import pack_variable_integer
 from mqttools.common import unpack_properties
-from mqttools.common import PropertyIds
-from mqttools.common import MalformedPacketError
-from mqttools.common import PayloadReader
 
 
 class PackUnpackTest(unittest.TestCase):

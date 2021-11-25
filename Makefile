@@ -1,2 +1,5 @@
 test:
-	python3 setup.py test
+	python3 -m unittest
+
+style:
+	isort --force-single-line-imports .

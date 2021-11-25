@@ -1,11 +1,11 @@
+import binascii
+import enum
 import logging
 import struct
-import enum
-from io import BytesIO
-import bitstruct
-import binascii
 import traceback
+from io import BytesIO
 
+import bitstruct
 
 # Connection flags.
 CLEAN_START    = 0x02

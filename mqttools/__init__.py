@@ -1,19 +1,19 @@
+import argparse
 import logging
 import sys
-import argparse
 
-from .version import __version__
+from .broker import Broker
+from .broker import BrokerThread
 from .client import Client
 from .client import ConnectError
 from .client import SessionResumeError
 from .client import SubscribeError
 from .client import UnsubscribeError
-from .broker import Broker
-from .broker import BrokerThread
 from .common import MalformedPacketError
-from .common import TimeoutError
 from .common import SubackReasonCode
+from .common import TimeoutError
 from .common import UnsubackReasonCode
+from .version import __version__
 
 
 def main():
@@ -38,10 +38,10 @@ def main():
 
     # Import when used for less dependencies. For example, curses is
     # not part of all Python builds.
-    from .subparsers import subscribe
-    from .subparsers import publish
-    from .subparsers import monitor
     from .subparsers import broker
+    from .subparsers import monitor
+    from .subparsers import publish
+    from .subparsers import subscribe
 
     subscribe.add_subparser(subparsers)
     publish.add_subparser(subparsers)

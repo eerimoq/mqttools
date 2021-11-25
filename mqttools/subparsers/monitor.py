@@ -1,12 +1,13 @@
+import asyncio
+import bisect
+import curses
 import ssl
 import sys
 import threading
-import asyncio
 import time
-import curses
-import bisect
-from queue import Queue
 from queue import Empty as QueueEmpty
+from queue import Queue
+
 from argparse_addons import Integer
 
 from ..client import Client

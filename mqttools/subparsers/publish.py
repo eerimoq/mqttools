@@ -1,9 +1,10 @@
-import ssl
 import asyncio
-import time
 import binascii
-from humanfriendly import format_timespan
+import ssl
+import time
+
 from argparse_addons import Integer
+from humanfriendly import format_timespan
 
 from ..client import Client
 from ..common import Error

@@ -1,6 +1,7 @@
 import asyncio
-import mqttools
 from uuid import uuid1
+
+import mqttools
 
 
 async def resume_session():
@@ -33,8 +34,5 @@ async def resume_session():
 
         print(f'Topic:   {topic}')
         print(f'Message: {message}')
-
-import logging
-logging.basicConfig(level=logging.DEBUG)
 
 asyncio.run(resume_session())

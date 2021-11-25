@@ -1,6 +1,6 @@
-import ssl
-import logging
 import asyncio
+import logging
+import ssl
 import unittest
 
 import mqttools

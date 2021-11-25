@@ -1,10 +1,9 @@
-import logging
 import asyncio
-import unittest
+import logging
 import socket
+import unittest
 
 import mqttools
-
 
 BROKER_PORT = 10341
 
