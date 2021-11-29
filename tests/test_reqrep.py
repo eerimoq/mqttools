@@ -57,7 +57,7 @@ class ReqRepTest(unittest.TestCase):
                 logger.debug(f"Received on {topic}: {message} with {properties}")
                 rep.publish(properties.get(PropertyIds.RESPONSE_TOPIC), response)
 
-        with self.assertRaises(asyncio.exceptions.TimeoutError):
+        with self.assertRaises(asyncio.TimeoutError):
             await asyncio.wait_for(
                 asyncio.gather(broker_task, responder(), requester()), timeout=1
             )
