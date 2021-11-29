@@ -25,6 +25,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup subscriber 1.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -98,6 +99,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Subscribe to "/a/b" and "/b/#" twice, all should be
             # successful. Subscribe to "/d/e" once.
@@ -182,6 +184,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber. Subscribe to /a/a, /a/b, /a/c and /a/d.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -282,6 +285,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber and subscribe to
             # "sport/tennis/player1/#".
@@ -351,6 +355,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber and subscribe to "#".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -398,6 +403,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber and subscribe to "+".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -445,6 +451,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber and subscribe to "sport/+/player1".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -492,6 +499,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber and subscribe to "sport/tennis/+".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -554,6 +562,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber. Subscribe to a/# and b/+.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -621,6 +630,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Try to resume a session that does not exist. A new
             # session should be created and immediately removed when
@@ -720,6 +730,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the pinger.
             reader, writer = await asyncio.open_connection(*address)
@@ -747,6 +758,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Connect with user name and password, and get 0x86 in
             # response.
@@ -773,6 +785,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Connect with authentication method, and get 0x8c in
             # response.
@@ -799,6 +812,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Send a publish packet instead of connect, nothing should
             # be received in response.
@@ -822,6 +836,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Malformed publish with property 0 should result in a
             # disconnect by the broker.
@@ -850,6 +865,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # It's a protocol error sending ping response to the
             # broker. should result in a disconnect by the broker.
@@ -878,6 +894,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Connect with maximum packet size set to 50.
             reader, writer = await asyncio.open_connection(*address)
@@ -929,6 +946,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber. Subscribe to 'foo' and 'a/#'.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -1024,6 +1042,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup a publisher.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -1095,6 +1114,7 @@ class BrokerTest(unittest.TestCase):
 
         async def tester():
             address = await broker.getsockname()
+            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
 
             # Setup the subscriber. Subscribe to 'foo'.
             reader_1, writer_1 = await asyncio.open_connection(*address)
