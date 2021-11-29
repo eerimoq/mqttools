@@ -545,7 +545,7 @@ class Broker(object):
     def remove_session(self, client_id):
         del self._sessions[client_id]
 
-    def  publish(self, topic, message, properties):
+    def publish(self, topic, message, properties=None):
         """Publish given topic and message to all subscribers.
 
         """
