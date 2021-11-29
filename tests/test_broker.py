@@ -6,6 +6,12 @@ import unittest
 import mqttools
 
 
+async def get_broker_address(broker):
+    # IPv6 gives 4-tuple, need only host and port.
+    address_tuple = await broker.getsockname()
+    return address_tuple[:2]
+
+
 class BrokerTest(unittest.TestCase):
 
     def create_broker(self):
@@ -22,11 +28,9 @@ class BrokerTest(unittest.TestCase):
 
     async def multiple_subscribers(self):
         broker, broker_task = self.create_broker()
+        address = await get_broker_address(broker)
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
-
             # Setup subscriber 1.
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
@@ -96,11 +100,9 @@ class BrokerTest(unittest.TestCase):
 
     async def subscribe_to_same_topic_twice(self):
         broker, broker_task = self.create_broker()
+        address = await get_broker_address(broker)
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
-
             # Subscribe to "/a/b" and "/b/#" twice, all should be
             # successful. Subscribe to "/d/e" once.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -181,11 +183,9 @@ class BrokerTest(unittest.TestCase):
 
     async def unsubscribe(self):
         broker, broker_task = self.create_broker()
+        address = await get_broker_address(broker)
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
-
             # Setup the subscriber. Subscribe to /a/a, /a/b, /a/c and /a/d.
             reader_1, writer_1 = await asyncio.open_connection(*address)
             connect = b'\x10\x10\x00\x04MQTT\x05\x02\x00\x00\x00\x00\x03su1'
