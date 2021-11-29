@@ -134,7 +134,7 @@ class ReconnectTest(unittest.TestCase):
         client.close()
         listener.close()
         client_thread.done.wait()
-        self.assertEqual(client_thread.messages, 6 * [(None, None)])
+        self.assertEqual(client_thread.messages, 6 * [(None, None, None)])
 
 
 logging.basicConfig(level=logging.DEBUG)

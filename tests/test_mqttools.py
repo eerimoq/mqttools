@@ -165,7 +165,7 @@ class MQTToolsTest(unittest.TestCase):
 
         self.assertEqual(cm.exception.reason,
                          mqttools.SubackReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED)
-        topic, message = self.run_until_complete(client.messages.get())
+        topic, message, _ = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/a/b')
         self.assertEqual(message, b'apa')
         self.run_until_complete(client.stop())
@@ -503,10 +503,10 @@ class MQTToolsTest(unittest.TestCase):
                                  keep_alive_s=0)
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe('/test/mqttools/foo'))
-        topic, message = self.run_until_complete(client.messages.get())
+        topic, message, _ = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/test/mqttools/foo')
         self.assertEqual(message, b'sets-alias-in-client')
-        topic, message = self.run_until_complete(client.messages.get())
+        topic, message, _ = self.run_until_complete(client.messages.get())
         self.assertEqual(topic, '/test/mqttools/foo')
         self.assertEqual(message, b'published-with-alias')
         self.run_until_complete(client.stop())
