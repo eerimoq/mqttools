@@ -239,7 +239,7 @@ class Client(object):
         self.log_info('Client connected.')
 
     def on_publish(self, payload, flags):
-        topic, message, _ = unpack_publish(payload, (flags >> 1) & 3)
+        topic, message, properties = unpack_publish(payload, (flags >> 1) & 3)
 
         if is_wildcards_in_topic(topic):
             raise MalformedPacketError(f'Invalid topic {topic} in publish.')
@@ -250,7 +250,7 @@ class Client(object):
             else:
                 self._broker.remove_retained_message(topic)
 
-        self._broker.publish(topic, message)
+        self._broker.publish(topic, message, properties)
 
     def on_subscribe(self, payload):
         packet_identifier, _, subscriptions = unpack_subscribe(payload)
@@ -312,8 +312,12 @@ class Client(object):
 
         raise DisconnectError()
 
-    def publish(self, topic, message, retain=False):
-        self._write_packet(pack_publish(topic, message, retain, None))
+    def publish(self, topic, message, retain=False, properties=None):
+        self._write_packet(
+            pack_publish(
+                topic, message, retain=retain, alias=None, properties=properties
+            )
+        )
 
     def disconnect(self):
         self._write_packet(pack_disconnect(self._disconnect_reason))
@@ -541,13 +545,15 @@ class Broker(object):
     def remove_session(self, client_id):
         del self._sessions[client_id]
 
-    def  publish(self, topic, message):
+    def  publish(self, topic, message, properties):
         """Publish given topic and message to all subscribers.
 
         """
 
         for session in self.iter_subscribers(topic):
-            session.client.publish(topic, message)
+            session.client.publish(
+                topic, message, retain=False, properties=properties
+            )
 
 
 class BrokerThread(threading.Thread):
