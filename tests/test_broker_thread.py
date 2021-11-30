@@ -21,7 +21,7 @@ async def start_stop_clients():
 
     message = await subscriber.messages.get()
 
-    if message != ('/apa', b'halloj'):
+    if message != ('/apa', b'halloj', {}):
         raise Exception('Wrong message {}'.format(message))
 
     await subscriber.stop()

@@ -276,7 +276,7 @@ class Client(object):
 
         """
 
-        await self._messages.put((topic, message))
+        await self._messages.put((topic, message, properties))
 
     async def start(self, resume_session=False):
         """Open a TCP connection to the broker and perform the MQTT connect
@@ -545,10 +545,12 @@ class Client(object):
             if reason != UnsubackReasonCode.SUCCESS:
                 raise UnsubscribeError(reason)
 
-    def publish(self, topic, message, retain=False):
+    def publish(self, topic, message, retain=False, properties=None):
         """Publish given message to given topic with QoS 0.
 
         Give `retain` as ``True`` to make the message retained.
+        Additional properties for the message can be provided
+        using the `properties` dict.
 
         >>> client.publish('/my/topic', b'my-message')
 
@@ -562,7 +564,7 @@ class Client(object):
         else:
             alias = None
 
-        self._write_packet(pack_publish(topic, message, retain, alias))
+        self._write_packet(pack_publish(topic, message, retain, alias, properties))
 
         if (alias is not None) and (topic != ''):
             self._registered_broker_topic_aliases.add(alias)

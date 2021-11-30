@@ -720,23 +720,31 @@ def unpack_unsuback(payload):
     return packet_identifier, properties, reasons
 
 
-def pack_publish(topic, message, retain, alias):
+def pack_publish(topic, message, retain, alias, properties):
     flags = 0
 
     if retain:
         flags |= 1
 
-    if alias is None:
-        properties = b'\x00'
+    # Copy properties dict because we might add alias and
+    # don't want to change the passed properties dict.
+    property_dict = dict(properties) if properties else dict()
+
+    if alias is not None:
+        property_dict[PropertyIds.TOPIC_ALIAS] = alias
+
+    if len(property_dict) > 0:
+        packed_properties = pack_properties(
+            packet_name='PUBLISH', properties=property_dict
+        )
     else:
-        properties = pack_properties('PUBLISH',
-                                     {PropertyIds.TOPIC_ALIAS: alias})
+        packed_properties = b'\x00'
 
     packed_topic = pack_string(topic)
-    size = len(packed_topic) + len(message) + len(properties)
+    size = len(packed_topic) + len(message) + len(packed_properties)
     packed = pack_fixed_header(ControlPacketType.PUBLISH, flags, size)
     packed += packed_topic
-    packed += properties
+    packed += packed_properties
     packed += message
 
     return packed
@@ -831,7 +839,6 @@ def format_publish(flags, payload):
         f'  Retain:     {retain}',
         f'  Topic:      {topic}',
         f'  Message:    {hexlify(message)}',
-        '  Properties:'
     ] + format_properties(properties)
 
 
@@ -859,7 +866,6 @@ def format_suback(payload):
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        '  Properties:'
     ] + format_properties(properties) + [
         '  Reasons:'
     ] + [
@@ -881,7 +887,6 @@ def format_unsuback(payload):
 
     return [
         f'  PacketIdentifier: {packet_identifier}',
-        '  Properties:'
     ] + format_properties(properties) + [
         '  Reasons:'
     ] + [
@@ -894,7 +899,6 @@ def format_disconnect(payload):
 
     return [
         f'  Reason:     {reason.name}({reason.value})',
-        '  Properties:'
     ] + format_properties(properties)
 
 

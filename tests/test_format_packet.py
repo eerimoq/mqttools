@@ -70,7 +70,6 @@ class FormatPacketTest(unittest.TestCase):
                     'Received DISCONNECT(14) packet of 17 byte(s)',
                     '  Reason:     UNSPECIFIED_ERROR(128)',
                     '  Properties:',
-                    '  Properties:',
                     '    REASON_STRING(31): Some error'
                 ],
                 'Received DISCONNECT(14): Reason=UNSPECIFIED_ERROR(128)'
@@ -88,7 +87,6 @@ class FormatPacketTest(unittest.TestCase):
                     '  Topic:      /a/b',
                     '  Message:    313233343536373839303031323334353637383930'
                     '303132333435363738393030313233343536373839',
-                    '  Properties:'
                 ],
                 'Received PUBLISH(3): Topic=/a/b, Message=31323334353637383930'
                 '3031323334353637383930303132333435363738393030313233343536373'
@@ -113,7 +111,6 @@ class FormatPacketTest(unittest.TestCase):
                 [
                     'Received SUBACK(9) packet of 6 byte(s)',
                     '  PacketIdentifier: 1',
-                    '  Properties:',
                     '  Reasons:',
                     '    GRANTED_QOS_0(0)'
                 ],
@@ -136,7 +133,6 @@ class FormatPacketTest(unittest.TestCase):
                 [
                     'Received UNSUBACK(11) packet of 7 byte(s)',
                     '  PacketIdentifier: 2',
-                    '  Properties:',
                     '  Reasons:',
                     '    SUCCESS(0)',
                     '    SUCCESS(0)'
