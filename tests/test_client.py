@@ -25,7 +25,7 @@ class ClientTest(unittest.TestCase):
         listener = await asyncio.start_server(on_client_connected, 'localhost', 0)
 
         async def client_main():
-            client = mqttools.Client(*listener.sockets[0].getsockname(),
+            client = mqttools.Client(*listener.sockets[0].getsockname()[:2],
                                      'connack',
                                      response_timeout=0.1,
                                      connect_delays=[],
@@ -50,7 +50,7 @@ class ClientTest(unittest.TestCase):
         listener = await asyncio.start_server(on_client_connected, 'localhost', 0)
 
         async def client_main():
-            client = mqttools.Client(*listener.sockets[0].getsockname(),
+            client = mqttools.Client(*listener.sockets[0].getsockname()[:2],
                                      'suback',
                                      response_timeout=0.1,
                                      topic_alias_maximum=0)
@@ -75,7 +75,7 @@ class ClientTest(unittest.TestCase):
         listener = await asyncio.start_server(on_client_connected, 'localhost', 0)
 
         async def client_main():
-            client = mqttools.Client(*listener.sockets[0].getsockname(),
+            client = mqttools.Client(*listener.sockets[0].getsockname()[:2],
                                      'unsuback',
                                      response_timeout=0.1,
                                      topic_alias_maximum=0)

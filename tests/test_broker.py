@@ -5,11 +5,7 @@ import unittest
 
 import mqttools
 
-
-async def get_broker_address(broker):
-    # IPv6 gives 4-tuple, need only host and port.
-    address_tuple = await broker.getsockname()
-    return address_tuple[:2]
+from .utils import get_broker_address
 
 
 class BrokerTest(unittest.TestCase):
@@ -284,8 +280,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber and subscribe to
             # "sport/tennis/player1/#".
@@ -354,8 +349,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber and subscribe to "#".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -402,8 +396,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber and subscribe to "+".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -450,8 +443,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber and subscribe to "sport/+/player1".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -498,8 +490,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber and subscribe to "sport/tennis/+".
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -561,8 +552,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber. Subscribe to a/# and b/+.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -629,8 +619,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Try to resume a session that does not exist. A new
             # session should be created and immediately removed when
@@ -729,8 +718,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the pinger.
             reader, writer = await asyncio.open_connection(*address)
@@ -757,8 +745,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Connect with user name and password, and get 0x86 in
             # response.
@@ -784,8 +771,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Connect with authentication method, and get 0x8c in
             # response.
@@ -811,8 +797,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Send a publish packet instead of connect, nothing should
             # be received in response.
@@ -835,8 +820,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Malformed publish with property 0 should result in a
             # disconnect by the broker.
@@ -864,8 +848,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # It's a protocol error sending ping response to the
             # broker. should result in a disconnect by the broker.
@@ -893,8 +876,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Connect with maximum packet size set to 50.
             reader, writer = await asyncio.open_connection(*address)
@@ -945,8 +927,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber. Subscribe to 'foo' and 'a/#'.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -1041,8 +1022,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup a publisher.
             reader_1, writer_1 = await asyncio.open_connection(*address)
@@ -1113,8 +1093,7 @@ class BrokerTest(unittest.TestCase):
         broker, broker_task = self.create_broker()
 
         async def tester():
-            address = await broker.getsockname()
-            address = address[:2]  # IPv6 gives 4-tuple, need only host, port
+            address = await get_broker_address(broker)
 
             # Setup the subscriber. Subscribe to 'foo'.
             reader_1, writer_1 = await asyncio.open_connection(*address)

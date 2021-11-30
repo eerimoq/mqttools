@@ -30,7 +30,7 @@ class Broker(threading.Thread):
 
     @property
     def address(self):
-        return self._listener.getsockname()
+        return self._listener.getsockname()[:2]
 
     def wait_for_client_closed(self):
         self._client_closed.get(timeout=1)

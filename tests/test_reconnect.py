@@ -45,7 +45,7 @@ class ReconnectTest(unittest.TestCase):
         listener.bind((HOST, PORT))
         listener.listen()
 
-        client_thread = Client(*listener.getsockname())
+        client_thread = Client(*listener.getsockname()[:2])
         client_thread.daemon = True
         client_thread.start()
 
