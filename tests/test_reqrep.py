@@ -24,6 +24,7 @@ class ReqRepTest(unittest.TestCase):
 
     async def reqrep(self):
         broker, broker_task = self.create_broker()
+
         address = await broker.getsockname()
         host, port = address[:2]
 
@@ -31,22 +32,21 @@ class ReqRepTest(unittest.TestCase):
         response_topic = "/b"
         request = b"ping"
         response = b"pong"
-        repetitions = 3
 
         async def requester():
             req = mqttools.Client(host, port)
             await req.start()
             await req.subscribe(response_topic)
-            for _ in range(repetitions):
-                req.publish(
-                    request_topic,
-                    request,
-                    retain=True,
-                    properties={PropertyIds.RESPONSE_TOPIC: response_topic},
-                )
-                topic, message, properties = await req.messages.get()
-                logger.debug(f"Received on {topic}: {message}")
-                self.assertEqual(message, response)
+
+            req.publish(
+                request_topic,
+                request,
+                retain=True,
+                properties={PropertyIds.RESPONSE_TOPIC: response_topic},
+            )
+            topic, message, properties = await req.messages.get()
+            logger.debug(f"Received on {topic}: {message}")
+            self.assertEqual(message, response)
 
         async def responder():
             rep = mqttools.Client(host, port)
@@ -57,10 +57,14 @@ class ReqRepTest(unittest.TestCase):
                 logger.debug(f"Received on {topic}: {message} with {properties}")
                 rep.publish(properties.get(PropertyIds.RESPONSE_TOPIC), response)
 
-        with self.assertRaises(asyncio.TimeoutError):
-            await asyncio.wait_for(
-                asyncio.gather(broker_task, responder(), requester()), timeout=1
-            )
+        tasks = {
+            broker_task,
+            asyncio.create_task(responder()),
+            asyncio.create_task(requester())
+        }
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in tasks:
+            task.cancel()
 
 
 logging.basicConfig(level=logging.DEBUG)
