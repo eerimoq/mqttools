@@ -271,16 +271,16 @@ class Client(object):
     @property
     def messages(self):
         """An ``asyncio.Queue`` of received messages from the broker. Each
-        message is a topic-message tuple.
+        message is a :class:`Message`.
 
         >>> await client.messages.get()
-        ('/my/topic', b'my-message')
+        Message('/my/topic', b'my-message')
 
-        A ``(None, None)`` message is put in the queue when the broker
+        A ``None`` message is put in the queue when the broker
         connection is lost.
 
         >>> await client.messages.get()
-        (None, None)
+        None
 
         """
 
@@ -563,7 +563,7 @@ class Client(object):
                 raise UnsubscribeError(reason)
 
     def publish(self, message):
-        """Publish given message with QoS 0.
+        """Publish given message :class:`Message` with QoS 0.
 
         >>> client.publish(Message('/my/topic', b'my-message'))
 
