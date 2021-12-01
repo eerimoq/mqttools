@@ -516,7 +516,7 @@ class Client(object):
 
         >>> await client.subscribe('/my/topic')
         >>> await client.messages.get()
-        ('/my/topic', b'my-message')
+        Message('/my/topic', b'my-message')
 
         """
 
