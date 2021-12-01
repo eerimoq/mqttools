@@ -17,14 +17,14 @@ async def subscriber():
     print('Waiting for messages.')
 
     while True:
-        topic, message = await client.messages.get()
+        message = await client.messages.get()
 
-        if topic is None:
+        if message is None:
             print('Broker connection lost!')
             break
 
-        print(f'Topic:   {topic}')
-        print(f'Message: {message}')
+        print(f'Topic:   {message.topic}')
+        print(f'Message: {message.message}')
 
 
 asyncio.run(subscriber())

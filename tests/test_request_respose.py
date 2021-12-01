@@ -2,7 +2,6 @@ import asyncio
 import unittest
 
 import mqttools
-from mqttools.common import PropertyIds
 
 from .utils import get_broker_address
 
@@ -39,18 +38,18 @@ class RequestResponseTest(unittest.TestCase):
         await responder.start()
         await responder.subscribe(request_topic)
 
-        requester.publish(request_topic,
-                          request,
-                          retain=True,
-                          properties={PropertyIds.RESPONSE_TOPIC: response_topic})
+        requester.publish(mqttools.Message(request_topic,
+                                           request,
+                                           True,
+                                           response_topic))
 
-        topic, _, properties = await responder.messages.get()
-        self.assertEqual(topic, request_topic)
-        responder.publish(properties[PropertyIds.RESPONSE_TOPIC], response)
+        message = await responder.messages.get()
+        self.assertEqual(message.topic, request_topic)
+        responder.publish(mqttools.Message(message.response_topic, response))
 
-        topic, message, _ = await requester.messages.get()
-        self.assertEqual(topic, response_topic)
-        self.assertEqual(message, response)
+        message = await requester.messages.get()
+        self.assertEqual(message.topic, response_topic)
+        self.assertEqual(message.message, response)
 
         broker_task.cancel()
         await asyncio.wait_for(broker_task, 1)

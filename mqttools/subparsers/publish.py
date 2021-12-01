@@ -7,6 +7,7 @@ from argparse_addons import Integer
 from humanfriendly import format_timespan
 
 from ..client import Client
+from ..client import Message
 from ..common import Error
 
 
@@ -91,7 +92,7 @@ async def publisher(host,
                                            size,
                                            number,
                                            fmt)
-            client.publish(topic, message_bytes, retain=retain)
+            client.publish(Message(topic, message_bytes, retain))
 
         elapsed_time = format_timespan(time.time() - start_time)
         print(f'Published {count} message(s) in {elapsed_time}.')

@@ -6,6 +6,7 @@ from .broker import Broker
 from .broker import BrokerThread
 from .client import Client
 from .client import ConnectError
+from .client import Message
 from .client import SessionResumeError
 from .client import SubscribeError
 from .client import UnsubscribeError

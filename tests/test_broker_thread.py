@@ -16,12 +16,12 @@ async def start_stop_clients():
     await subscriber.subscribe('/apa')
 
     await publisher.start()
-    publisher.publish('/apa', b'halloj')
+    publisher.publish(mqttools.Message('/apa', b'halloj'))
     await publisher.stop()
 
     message = await subscriber.messages.get()
 
-    if message != ('/apa', b'halloj', {}):
+    if message.topic != '/apa' or message.message != b'halloj':
         raise Exception('Wrong message {}'.format(message))
 
     await subscriber.stop()

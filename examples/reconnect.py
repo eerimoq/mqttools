@@ -1,17 +1,17 @@
 import asyncio
-import logging
 
 import mqttools
 
 
 async def handle_messages(client):
     while True:
-        topic, message = await client.messages.get()
-        print(f'Got {message} on {topic}.')
+        message = await client.messages.get()
 
-        if topic is None:
+        if message is None:
             print('Connection lost.')
             break
+
+        print(f'Got {message.message} on {message.topic}.')
 
 
 async def reconnector():
@@ -24,8 +24,5 @@ async def reconnector():
         await client.start()
         await handle_messages(client)
         await client.stop()
-
-
-logging.basicConfig(level=logging.INFO)
 
 asyncio.run(reconnector())

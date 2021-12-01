@@ -9,14 +9,14 @@ async def publish_to_self():
     await client.start()
     await client.subscribe('/test/mqttools/foo')
 
-    client.publish('/test/mqttools/foo', b'publish_to_self message')
-    topic, message = await client.messages.get()
+    client.publish(mqttools.Message('/test/mqttools/foo', b'publish_to_self message'))
+    message = await client.messages.get()
 
-    if topic is None:
+    if message is None:
         print('Broker connection lost!')
     else:
-        print(f'Topic:   {topic}')
-        print(f'Message: {message}')
+        print(f'Topic:   {message.topic}')
+        print(f'Message: {message.message}')
 
 
 asyncio.run(publish_to_self())

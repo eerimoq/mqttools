@@ -31,6 +31,23 @@ from .common import unpack_unsuback
 LOGGER = logging.getLogger(__name__)
 
 
+class Message:
+    """A message.
+
+    Give `retain` as ``True`` to make the message retained.
+
+    Give `response_topic` as a topic string to publish a response
+    topic.
+
+    """
+
+    def __init__(self, topic, message, retain=False, response_topic=None):
+        self.topic = topic
+        self.message = message
+        self.retain = retain
+        self.response_topic = response_topic
+
+
 class SessionResumeError(Error):
     pass
 
@@ -156,7 +173,7 @@ class Client(object):
     Use an async context manager for automatic start and stop:
 
     >>> async with Client('broker.hivemq.com', 1883) as client:
-    ...     client.publish('foo', b'bar')
+    ...     client.publish(Message('foo', b'bar'))
 
     """
 
@@ -269,14 +286,14 @@ class Client(object):
 
         return self._messages
 
-    async def on_message(self, topic, message, retain, properties):
+    async def on_message(self, message):
         """Called for each received MQTT message and when the broker
         connection is lost. Puts the message on the messages queue by
         default.
 
         """
 
-        await self._messages.put((topic, message, properties))
+        await self._messages.put(message)
 
     async def start(self, resume_session=False):
         """Open a TCP connection to the broker and perform the MQTT connect
@@ -545,16 +562,14 @@ class Client(object):
             if reason != UnsubackReasonCode.SUCCESS:
                 raise UnsubscribeError(reason)
 
-    def publish(self, topic, message, retain=False, properties=None):
-        """Publish given message to given topic with QoS 0.
+    def publish(self, message):
+        """Publish given message with QoS 0.
 
-        Give `retain` as ``True`` to make the message retained.
-        Additional properties for the message can be provided
-        using the `properties` dict.
-
-        >>> client.publish('/my/topic', b'my-message')
+        >>> client.publish(Message('/my/topic', b'my-message'))
 
         """
+
+        topic = message.topic
 
         if topic in self._tx_topic_aliases:
             alias = self._tx_topic_aliases[topic]
@@ -564,7 +579,18 @@ class Client(object):
         else:
             alias = None
 
-        self._write_packet(pack_publish(topic, message, retain, alias, properties))
+        properties = {}
+
+        if alias is not None:
+            properties[PropertyIds.TOPIC_ALIAS] = alias
+
+        if message.response_topic is not None:
+            properties[PropertyIds.RESPONSE_TOPIC] = message.response_topic
+
+        self._write_packet(pack_publish(topic,
+                                        message.message,
+                                        message.retain,
+                                        properties))
 
         if (alias is not None) and (topic != ''):
             self._registered_broker_topic_aliases.add(alias)
@@ -596,7 +622,10 @@ class Client(object):
                              alias)
                 return
 
-        await self.on_message(topic, message, bool(flags & 1), properties)
+        await self.on_message(Message(topic,
+                                      message,
+                                      bool(flags & 1),
+                                      properties.get(PropertyIds.RESPONSE_TOPIC)))
 
     def on_suback(self, payload):
         packet_identifier, properties, reasons = unpack_suback(payload)
@@ -742,4 +771,4 @@ class Client(object):
     async def _close(self):
         self.disconnect()
         self._writer.close()
-        await self.on_message(None, None, None, None)
+        await self.on_message(None)

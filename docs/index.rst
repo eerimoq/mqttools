@@ -14,6 +14,9 @@ Functions and classes
 .. autoclass:: mqttools.Client
    :members:
 
+.. autoclass:: mqttools.Message
+   :members:
+
 .. autoclass:: mqttools.Broker
    :members: serve_forever
 

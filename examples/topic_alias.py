@@ -11,10 +11,10 @@ async def publisher():
                              ])
 
     await client.start()
-    client.publish('/test/mqttools/foo', b'sets-alias-in-broker')
-    client.publish('/test/mqttools/foo', b'published-with-alias')
-    client.publish('/test/mqttools/fie', b'not-using-alias')
-    client.publish('/test/mqttools/fie', b'not-using-alias')
+    client.publish(mqttools.Message('/test/mqttools/foo', b'sets-alias-in-broker'))
+    client.publish(mqttools.Message('/test/mqttools/foo', b'published-with-alias'))
+    client.publish(mqttools.Message('/test/mqttools/fie', b'not-using-alias'))
+    client.publish(mqttools.Message('/test/mqttools/fie', b'not-using-alias'))
     await client.stop()
     print("Successfully published b'bar' on /test/mqttools/foo.")
 

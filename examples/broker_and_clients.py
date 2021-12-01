@@ -36,11 +36,11 @@ async def client_main():
         print()
         message = str(int(time.time())).encode('ascii')
         print(f'client: Publishing {message} on /ping.')
-        client.publish('/ping', message)
-        topic, message = await client.messages.get()
-        print(f'client: Got {message} on {topic}.')
+        client.publish(mqttools.Message('/ping', message))
+        message = await client.messages.get()
+        print(f'client: Got {message.message} on {message.topic}.')
 
-        if topic is None:
+        if message is None:
             print('Client connection lost.')
             break
 
@@ -57,15 +57,15 @@ async def echo_client_main():
     await client.subscribe('/ping')
 
     while True:
-        topic, message = await client.messages.get()
-        print(f'echo_client: Got {message} on {topic}.')
+        message = await client.messages.get()
+        print(f'echo_client: Got {message.message} on {message.topic}.')
 
-        if topic is None:
+        if message is None:
             print('Echo client connection lost.')
             break
 
-        print(f'echo_client: Publishing {message} on /pong.')
-        client.publish('/pong', message)
+        print(f'echo_client: Publishing {message.message} on /pong.')
+        client.publish(mqttools.Message('/pong', message.message))
 
 
 async def broker_main():

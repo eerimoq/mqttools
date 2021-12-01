@@ -12,19 +12,21 @@ async def unsubscriber():
 
     print('Subscribing to /test/mqttools/foo.')
     await client.subscribe('/test/mqttools/foo')
-    topic, message = await client.messages.get()
+    message = await client.messages.get()
 
-    print(f'Topic:   {topic}')
-    print(f'Message: {message}')
+    print(f'Topic:   {message.topic}')
+    print(f'Message: {message.message}')
 
     print('Unsubscribing from /test/mqttools/foo.')
     await client.unsubscribe('/test/mqttools/foo')
 
     # Should only return when the broker connection is lost.
-    topic, message = await client.messages.get()
+    message = await client.messages.get()
 
-    print(f'Topic:   {topic}')
-    print(f'Message: {message}')
+    if message is not None:
+        print('Got unexpected message:')
+        print(f'  Topic:   {message.topic}')
+        print(f'  Message: {message.message}')
 
 
 asyncio.run(unsubscriber())

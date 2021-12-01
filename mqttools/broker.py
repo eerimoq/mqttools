@@ -131,7 +131,8 @@ class Client(object):
             if self._session.will_topic is not None:
                 if not self.is_normal_disconnection():
                     self._broker.publish(self._session.will_topic,
-                                         self._session.will_message)
+                                         self._session.will_message,
+                                         {})
 
                     if self._session.will_retain:
                         self._broker.add_retained_message(self._session.will_topic,
@@ -281,7 +282,7 @@ class Client(object):
         self._write_packet(pack_suback(packet_identifier, reasons))
 
         for topic, message in retained_messages:
-            self.publish(topic, message, True)
+            self.publish(topic, message, True, {})
 
     def on_unsubscribe(self, payload):
         packet_identifier, topics = unpack_unsubscribe(payload)
@@ -312,12 +313,8 @@ class Client(object):
 
         raise DisconnectError()
 
-    def publish(self, topic, message, retain=False, properties=None):
-        self._write_packet(
-            pack_publish(
-                topic, message, retain=retain, alias=None, properties=properties
-            )
-        )
+    def publish(self, topic, message, retain, properties):
+        self._write_packet(pack_publish(topic, message, retain, properties))
 
     def disconnect(self):
         self._write_packet(pack_disconnect(self._disconnect_reason))
@@ -545,15 +542,13 @@ class Broker(object):
     def remove_session(self, client_id):
         del self._sessions[client_id]
 
-    def publish(self, topic, message, properties=None):
+    def publish(self, topic, message, properties):
         """Publish given topic and message to all subscribers.
 
         """
 
         for session in self.iter_subscribers(topic):
-            session.client.publish(
-                topic, message, retain=False, properties=properties
-            )
+            session.client.publish(topic, message, False, properties)
 
 
 class BrokerThread(threading.Thread):

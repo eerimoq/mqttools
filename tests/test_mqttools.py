@@ -165,9 +165,9 @@ class MQTToolsTest(unittest.TestCase):
 
         self.assertEqual(cm.exception.reason,
                          mqttools.SubackReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED)
-        topic, message, _ = self.run_until_complete(client.messages.get())
-        self.assertEqual(topic, '/a/b')
-        self.assertEqual(message, b'apa')
+        message = self.run_until_complete(client.messages.get())
+        self.assertEqual(message.topic, '/a/b')
+        self.assertEqual(message.message, b'apa')
         self.run_until_complete(client.stop())
 
     def test_subscribe_retain_handling_values(self):
@@ -256,7 +256,7 @@ class MQTToolsTest(unittest.TestCase):
                                  keep_alive_s=0,
                                  topic_alias_maximum=0)
         self.run_until_complete(client.start())
-        client.publish('/a/b', b'apa')
+        client.publish(mqttools.Message('/a/b', b'apa'))
         self.run_until_complete(client.stop())
 
     def test_command_line_publish_qos_0(self):
@@ -410,9 +410,9 @@ class MQTToolsTest(unittest.TestCase):
                                  topic_alias_maximum=0,
                                  keep_alive_s=0)
         self.run_until_complete(client.start())
-        client.publish('/test/mqttools/foo', b'sets-alias-in-broker')
-        client.publish('/test/mqttools/foo', b'published-with-alias')
-        client.publish('/test/mqttools/fie', b'not-using-alias')
+        client.publish(mqttools.Message('/test/mqttools/foo', b'sets-alias-in-broker'))
+        client.publish(mqttools.Message('/test/mqttools/foo', b'published-with-alias'))
+        client.publish(mqttools.Message('/test/mqttools/fie', b'not-using-alias'))
         self.run_until_complete(client.stop())
 
     def test_use_all_topic_aliases(self):
@@ -437,8 +437,8 @@ class MQTToolsTest(unittest.TestCase):
                                  topic_alias_maximum=0,
                                  keep_alive_s=0)
         self.run_until_complete(client.start())
-        client.publish('/foo', b'apa')
-        client.publish('/bar', b'cat')
+        client.publish(mqttools.Message('/foo', b'apa'))
+        client.publish(mqttools.Message('/bar', b'cat'))
         self.run_until_complete(client.stop())
 
     def test_connack_unspecified_error(self):
@@ -503,12 +503,12 @@ class MQTToolsTest(unittest.TestCase):
                                  keep_alive_s=0)
         self.run_until_complete(client.start())
         self.run_until_complete(client.subscribe('/test/mqttools/foo'))
-        topic, message, _ = self.run_until_complete(client.messages.get())
-        self.assertEqual(topic, '/test/mqttools/foo')
-        self.assertEqual(message, b'sets-alias-in-client')
-        topic, message, _ = self.run_until_complete(client.messages.get())
-        self.assertEqual(topic, '/test/mqttools/foo')
-        self.assertEqual(message, b'published-with-alias')
+        message = self.run_until_complete(client.messages.get())
+        self.assertEqual(message.topic, '/test/mqttools/foo')
+        self.assertEqual(message.message, b'sets-alias-in-client')
+        message = self.run_until_complete(client.messages.get())
+        self.assertEqual(message.topic, '/test/mqttools/foo')
+        self.assertEqual(message.message, b'published-with-alias')
         self.run_until_complete(client.stop())
 
     def test_resume_session(self):

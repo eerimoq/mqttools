@@ -15,18 +15,18 @@ async def main():
     print('Subscribed to topic /mqttools/incrementer/value/request.')
 
     while True:
-        topic, message = await client.messages.get()
+        message = await client.messages.get()
 
-        if topic is None:
+        if message is None:
             print('Broker connection lost!')
             break
 
-        count = int(message)
+        count = int(message.message)
         print(f'Request count:  {count}')
         count += 1
         print(f'Response count: {count}')
-        client.publish('/mqttools/counter-client/value/response',
-                       str(count).encode('ascii'))
+        client.publish(mqttools.Message('/mqttools/counter-client/value/response',
+                                        str(count).encode('ascii')))
 
 
 asyncio.run(main())
