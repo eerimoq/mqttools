@@ -1,6 +1,3 @@
-|buildstatus|_
-|coverage|_
-
 MQTT Tools
 ==========
 
@@ -149,14 +146,14 @@ An example connecting to an MQTT broker, subscribing to the topic
        await client.subscribe('/test/#')
 
        while True:
-           topic, message = await client.messages.get()
+           message = await client.messages.get()
 
-           if topic is None:
+           if message is None:
                print('Broker connection lost!')
                break
 
-           print(f'Topic:   {topic}')
-           print(f'Message: {message}')
+           print(f'Topic:   {message.topic}')
+           print(f'Message: {message.message}')
 
    asyncio.run(subscriber())
 
@@ -173,14 +170,8 @@ An example connecting to an MQTT broker and publishing the message
 
    async def publisher():
        async with mqttools.Client('localhost', 1883) as client:
-           client.publish('/test/mqttools/foo', b'bar')
+           client.publish(mqttools.Message('/test/mqttools/foo', b'bar'))
 
    asyncio.run(publisher())
-
-.. |buildstatus| image:: https://travis-ci.org/eerimoq/mqttools.svg?branch=master
-.. _buildstatus: https://travis-ci.org/eerimoq/mqttools
-
-.. |coverage| image:: https://coveralls.io/repos/github/eerimoq/mqttools/badge.svg?branch=master
-.. _coverage: https://coveralls.io/github/eerimoq/mqttools
 
 .. _examples folder: https://github.com/eerimoq/mqttools/tree/master/examples
