@@ -66,12 +66,14 @@ class ClientThread(threading.Thread):
             await client.start()
 
             while True:
-                topic, message = await client.messages.get()
+                message = await client.messages.get()
 
-                if topic is None:
+                if message is None:
                     break
 
-                self._queue.put((time.strftime('%H:%M:%S'), topic, message))
+                self._queue.put((time.strftime('%H:%M:%S'),
+                                 message.topic,
+                                 message.message))
 
             await client.stop()
 

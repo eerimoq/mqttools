@@ -41,14 +41,14 @@ async def subscriber(host,
         print('Connected.')
 
         while True:
-            topic, message = await client.messages.get()
+            message = await client.messages.get()
 
-            if topic is None:
+            if message is None:
                 print('Broker connection lost!')
                 break
 
-            print(f'Topic:   {topic}')
-            print(f'Message: {format_message(message_format, message)}')
+            print(f'Topic:   {message.topic}')
+            print(f'Message: {format_message(message_format, message.message)}')
 
         await client.stop()
 
