@@ -47,8 +47,11 @@ async def subscriber(host,
                 print('Broker connection lost!')
                 break
 
-            print(f'Topic:   {message.topic}')
-            print(f'Message: {format_message(message_format, message.message)}')
+            print(f'Topic:         {message.topic}')
+            print(f'Message:       '
+                  f'{format_message(message_format, message.message)}')
+            print(f'Retain:        {message.retain}')
+            print(f'ResponseTopic: {message.response_topic}')
 
         await client.stop()
 

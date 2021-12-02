@@ -59,7 +59,8 @@ async def publisher(host,
                     cafile,
                     check_hostname,
                     topic,
-                    message):
+                    message,
+                    response_topic):
     if will_message is not None:
         will_message = encode_message(will_message, message_format)
 
@@ -92,7 +93,10 @@ async def publisher(host,
                                            size,
                                            number,
                                            fmt)
-            client.publish(Message(topic, message_bytes, retain))
+            client.publish(Message(topic,
+                                   message_bytes,
+                                   retain,
+                                   response_topic))
 
         elapsed_time = format_timespan(time.time() - start_time)
         print(f'Published {count} message(s) in {elapsed_time}.')
@@ -113,7 +117,8 @@ def _do_publish(args):
                           args.cafile,
                           not args.no_check_hostname,
                           args.topic,
-                          args.message))
+                          args.message,
+                          args.response_topic))
 
 
 def add_subparser(subparsers):
@@ -146,6 +151,8 @@ def add_subparser(subparsers):
     subparser.add_argument('--will-retain',
                            action='store_true',
                            help='Retain the will message.')
+    subparser.add_argument('--response-topic',
+                           help='Response topic.')
     subparser.add_argument(
         '--session-expiry-interval',
         type=Integer(0, 0xffffffff),
