@@ -738,10 +738,10 @@ class BrokerTest(unittest.TestCase):
 
         await asyncio.wait_for(asyncio.gather(broker_task, tester()), 1)
 
-    def test_authentication_with_user_name_and_password(self):
-        asyncio.run(self.authentication_with_user_name_and_password())
+    def test_authentication_with_username_and_password(self):
+        asyncio.run(self.authentication_with_username_and_password())
 
-    async def authentication_with_user_name_and_password(self):
+    async def authentication_with_username_and_password(self):
         broker, broker_task = self.create_broker()
 
         async def tester():

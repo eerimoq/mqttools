@@ -409,6 +409,8 @@ def pack_connect(client_id,
                  will_message,
                  will_retain,
                  will_qos,
+                 username,
+                 password,
                  keep_alive_s,
                  properties):
     flags = 0
@@ -434,6 +436,15 @@ def pack_connect(client_id,
         payload_length += len(packed_will_topic)
         payload_length += len(will_message) + 2
 
+    if password is not None:
+        flags |= PASSWORD_FLAG
+        payload_length += len(password) + 2
+
+    if username is not None:
+        flags |= USER_NAME_FLAG
+        packed_username = pack_string(username)
+        payload_length += len(packed_username)
+
     properties = pack_properties('CONNECT', properties)
     packed = pack_fixed_header(ControlPacketType.CONNECT,
                                0,
@@ -450,6 +461,12 @@ def pack_connect(client_id,
         packed += pack_variable_integer(0)
         packed += packed_will_topic
         packed += pack_binary(will_message)
+
+    if flags & USER_NAME_FLAG:
+        packed += packed_username
+
+    if flags & PASSWORD_FLAG:
+        packed += pack_binary(password)
 
     return packed
 
@@ -501,9 +518,9 @@ def unpack_connect(payload):
         will_retain = None
 
     if flags & USER_NAME_FLAG:
-        user_name = unpack_string(payload)
+        username = unpack_string(payload)
     else:
-        user_name = None
+        username = None
 
     if flags & PASSWORD_FLAG:
         password = unpack_binary(payload)
@@ -517,7 +534,7 @@ def unpack_connect(payload):
             will_retain,
             keep_alive_s,
             properties,
-            user_name,
+            username,
             password)
 
 
@@ -790,7 +807,7 @@ def format_connect(payload):
      will_retain,
      keep_alive_s,
      properties,
-     user_name,
+     username,
      password) = unpack_connect(payload)
 
     return [
@@ -800,7 +817,7 @@ def format_connect(payload):
         f'  WillMessage: {hexlify(will_message)}',
         f'  WillRetain:  {will_retain}',
         f'  KeepAlive:   {keep_alive_s}',
-        f'  UserName:    {user_name}',
+        f'  UserName:    {username}',
         f'  Password:    {password}'
     ] + format_properties(properties)
 
@@ -934,7 +951,7 @@ def format_connect_compact(payload):
      _,
      keep_alive_s,
      _,
-     __name,
+     _name,
      _) = unpack_connect(payload)
 
     parts = [f'ClientId={client_id}']

@@ -191,7 +191,7 @@ class Client(object):
          will_retain,
          keep_alive_s,
          properties,
-         user_name,
+         username,
          password) = unpack_connect(payload)
         self._session, session_present = self._broker.get_session(
             client_id,
@@ -222,7 +222,7 @@ class Client(object):
             session_expiry_interval = properties[PropertyIds.SESSION_EXPIRY_INTERVAL]
             self._session.expiry_interval = session_expiry_interval
 
-        if (user_name is not None) or (password is not None):
+        if (username is not None) or (password is not None):
             reason = ConnectReasonCode.BAD_USER_NAME_OR_PASSWORD
 
         self._write_packet(pack_connack(

@@ -60,7 +60,9 @@ async def publisher(host,
                     check_hostname,
                     topic,
                     message,
-                    response_topic):
+                    response_topic,
+                    username,
+                    password):
     if will_message is not None:
         will_message = encode_message(will_message, message_format)
 
@@ -73,6 +75,9 @@ async def publisher(host,
     else:
         context = None
 
+    if password is not None:
+        password = password.encode('utf-8')
+
     print(f"Connecting to '{host}:{port}'.")
     print()
 
@@ -83,6 +88,8 @@ async def publisher(host,
                       will_message=will_message,
                       will_retain=will_retain,
                       session_expiry_interval=session_expiry_interval,
+                      username=username,
+                      password=password,
                       ssl=context) as client:
         fmt = '{{:0{}}}'.format(len(str(count - 1)))
         start_time = time.time()
@@ -118,7 +125,9 @@ def _do_publish(args):
                           not args.no_check_hostname,
                           args.topic,
                           args.message,
-                          args.response_topic))
+                          args.response_topic,
+                          args.username,
+                          args.password))
 
 
 def add_subparser(subparsers):
@@ -153,6 +162,10 @@ def add_subparser(subparsers):
                            help='Retain the will message.')
     subparser.add_argument('--response-topic',
                            help='Response topic.')
+    subparser.add_argument('--username',
+                           help='Username.')
+    subparser.add_argument('--password',
+                           help='Password.')
     subparser.add_argument(
         '--session-expiry-interval',
         type=Integer(0, 0xffffffff),

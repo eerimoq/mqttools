@@ -10,32 +10,44 @@ from mqttools.common import pack_u8
 from mqttools.common import pack_u16
 from mqttools.common import pack_u32
 from mqttools.common import pack_variable_integer
+from mqttools.common import unpack_connect
 from mqttools.common import unpack_properties
 
 
 class PackUnpackTest(unittest.TestCase):
 
-    def test_pack_connect(self):
+    def test_pack_unpack_connect(self):
         datas = [
             (
-                ('client-id', True, '', b'', None, 0, 0, {}),
-                b'\x10\x16\x00\x04MQTT\x05\x02\x00\x00\x00\x00\tclient-id'
+                ('client-id', True, '', b'', None, 0, None, None, 0, {}),
+                b'\x10\x16\x00\x04MQTT\x05\x02\x00\x00\x00\x00\tclient-id',
+                ('client-id', True, None, None, None, 0, {}, None, None)
             ),
             (
-                ('abc', True, 'foo', b'bar', False, 0, 600, {}),
+                ('abc', True, 'foo', b'bar', False, 0, None, None, 600, {}),
                 b'\x10\x1b\x00\x04MQTT\x05\x06\x02X\x00\x00\x03abc\x00\x00\x03'
-                b'foo\x00\x03bar'
+                b'foo\x00\x03bar',
+                ('abc', True, 'foo', b'bar', False, 600, {}, None, None)
             ),
             (
-                ('abc', True, 'foo2', b'bar', True, 1, 3600, {}),
+                ('abc', True, 'foo2', b'bar', True, 1, None, None, 3600, {}),
                 b'\x10\x1c\x00\x04MQTT\x05\x2e\x0e\x10\x00\x00\x03abc\x00\x00'
-                b'\x04foo2\x00\x03bar'
+                b'\x04foo2\x00\x03bar',
+                ('abc', True, 'foo2', b'bar', True, 3600, {}, None, None)
+            ),
+            (
+                ('abc', True, 'foo', b'bar', True, 1, "user", b"pass", 0, {}),
+                b'\x10\'\x00\x04MQTT\x05\xee\x00\x00\x00\x00\x03abc\x00\x00'
+                b'\x03foo\x00\x03bar\x00\x04user\x00\x04pass',
+                ('abc', True, 'foo', b'bar', True, 0, {}, 'user', b'pass')
             )
         ]
 
-        for args, expected_packed in datas:
+        for args, expected_packed, expected_unpacked in datas:
             packed = pack_connect(*args)
             self.assertEqual(packed, expected_packed)
+            unpacked = unpack_connect(PayloadReader(packed[2:]))
+            self.assertEqual(unpacked, expected_unpacked)
 
     def test_unpack_properties(self):
         buf = pack_u8(PropertyIds.PAYLOAD_FORMAT_INDICATOR)

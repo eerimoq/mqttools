@@ -147,6 +147,9 @@ class Client(object):
     connected. If ``[]``, only one connection attempt is performed. If
     ``None``, the default delays ``[1, 2, 4, 8]`` are used.
 
+    `username` and `password` are the credentials. The password must
+    be bytes. By default no credentials are used.
+
     `kwargs` are passed to ``asyncio.open_connection()``.
 
     Create a client with default configuration:
@@ -192,6 +195,8 @@ class Client(object):
                  session_expiry_interval=0,
                  subscriptions=None,
                  connect_delays=None,
+                 username=None,
+                 password=None,
                  **kwargs):
         self._host = host
         self._port = port
@@ -205,6 +210,8 @@ class Client(object):
         self._will_retain = will_retain
         self._will_qos = will_qos
         self._keep_alive_s = keep_alive_s
+        self._username = username
+        self._password = password
         self._kwargs = kwargs
         self.response_timeout = response_timeout
         self._connect_properties = {}
@@ -457,6 +464,8 @@ class Client(object):
                                         self._will_message,
                                         self._will_retain,
                                         self._will_qos,
+                                        self._username,
+                                        self._password,
                                         self._keep_alive_s,
                                         self._connect_properties))
 
