@@ -156,7 +156,7 @@ class Client(object):
 
     >>> client = Client('broker.hivemq.com', 1883)
 
-    Create a client with using all optional arguments:
+    Create a client with all optional arguments given:
 
     >>> client = Client('broker.hivemq.com',
                         1883,
@@ -171,6 +171,8 @@ class Client(object):
                         session_expiry_interval=1800,
                         subscriptions=['a/b', ('test/#', 2)],
                         connect_delays=[1, 2],
+                        username='user',
+                        password=b'pass',
                         ssl=True)
 
     Use an async context manager for automatic start and stop:
